@@ -1,0 +1,156 @@
+name: doboard
+description: A powerful, friction-free task and notes app with Kanban-style boards.
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: "^3.8.0"
+  flutter: ">=3.22.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # ─────────────────────────────────────────
+  # STATE MANAGEMENT
+  # ─────────────────────────────────────────
+
+  # Riverpod: gestor de estado principal
+  # AsyncNotifier + StreamProvider para reactividad con Drift
+  flutter_riverpod: ^2.5.1
+
+  # Hooks: useTextEditingController, useAnimationController, etc.
+  # Reduce boilerplate en widgets con estado local
+  flutter_hooks: ^0.21.3+1
+  hooks_riverpod: ^2.5.1
+
+  # ─────────────────────────────────────────
+  # PERSISTENCIA LOCAL (Local First)
+  # ─────────────────────────────────────────
+
+  # Drift: SQLite con tipos fuertes, migraciones, streams reactivos
+  # La capa Data implementa los repositorios sobre Drift
+  # Cuando llegue Firebase: solo se sustituye la implementación del repo
+  drift: ^2.18.0
+  sqlite3_flutter_libs: ^0.5.24
+  path_provider: ^2.1.3
+  path: ^1.9.0
+
+  # ─────────────────────────────────────────
+  # NAVEGACIÓN
+  # ─────────────────────────────────────────
+
+  # go_router: navegación declarativa con deep linking
+  # Preparado para notificaciones push (futuro) y rutas nombradas
+  go_router: ^17.1.0
+
+  # ─────────────────────────────────────────
+  # UI — DRAG & DROP Y REORDENACIÓN
+  # ─────────────────────────────────────────
+
+  # flutter_reorderable_list: reordenación vertical dentro de cada tablero
+  # con animaciones nativas tipo "levantar tarjeta"
+  # Complementa al LongPressDraggable nativo de Flutter para D&D entre tableros
+  flutter_reorderable_list: ^1.0.1
+
+  # ─────────────────────────────────────────
+  # UI — EDICIÓN ENRIQUECIDA
+  # ─────────────────────────────────────────
+
+  # flutter_quill: editor enriquecido para las notas de cada tarea
+  # Soporta negrita, cursiva, listas, links
+  # En modo lectura se renderiza con flutter_markdown (más ligero)
+  flutter_quill: ^11.5.0
+
+  # flutter_markdown: renderizado de contenido markdown en tarjetas (preview)
+  # y en la vista de nota cuando está en modo solo lectura
+  flutter_markdown: ^0.7.3
+
+  # url_launcher: abrir links detectados en notas y previews
+  url_launcher: ^6.3.0
+
+  # ─────────────────────────────────────────
+  # UI — ANIMACIONES Y GESTOS
+  # ─────────────────────────────────────────
+
+  # animate_do: animaciones de entrada declarativas (FadeInUp, SlideInRight)
+  # Para la aparición de tarjetas, apertura de menús contextuales, etc.
+  animate_do: ^4.2.0
+
+  # flutter_slidable: gestos de slide sobre tarjetas (swipe → completar / eliminar)
+  # Gestos rápidos sin abrir el menú contextual
+  flutter_slidable: ^4.0.3
+
+  # ─────────────────────────────────────────
+  # UI — TEMA Y ESTILOS
+  # ─────────────────────────────────────────
+
+  # google_fonts: fuente principal de la app
+  # Se usa Inter para el cuerpo y texto, DM Sans para encabezados
+  google_fonts: ^8.0.2
+
+  # flex_color_scheme: sistema de temas claro/oscuro con Material 3
+  # Genera ThemeData completo a partir de colores semilla
+  flex_color_scheme: ^8.3.1
+
+  # ─────────────────────────────────────────
+  # AUTOMATIZACIONES Y UTILIDADES
+  # ─────────────────────────────────────────
+
+  # collection: utilidades para listas (sortBy, groupBy, etc.)
+  # Usado en AutomationEngine y en los use cases de ordenación
+  collection: ^1.18.0
+
+  # uuid: generación de IDs únicos para tareas, tableros y notas
+  uuid: ^4.4.0
+
+  # intl: formateo de fechas (Hoy, Mañana, lunes 27 mar)
+  intl: ^0.20.2
+
+  # shared_preferences: ajustes simples del usuario
+  # (posición del input, texto size, tableros visibles, automatizaciones on/off)
+  shared_preferences: ^2.3.1
+
+  # ─────────────────────────────────────────
+  # FUTURO: SINCRONIZACIÓN EN NUBE
+  # (Comentado — descomentar cuando se implemente Firebase)
+  # ─────────────────────────────────────────
+
+  # firebase_core: ^3.0.0
+  # cloud_firestore: ^5.0.0
+  # firebase_auth: ^5.0.0
+  # firebase_analytics: ^11.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  # ─────────────────────────────────────────
+  # GENERACIÓN DE CÓDIGO (build_runner)
+  # ─────────────────────────────────────────
+
+  # build_runner: motor de generación de código
+  # Un solo comando genera todo: Freezed + Drift + Riverpod
+  # flutter pub run build_runner build --delete-conflicting-outputs
+  build_runner: ^2.4.11
+
+  # Generador de Drift (tablas, queries, DAOs)
+  drift_dev: ^2.18.0
+
+  # Linting y calidad de código
+  flutter_lints: ^6.0.0
+  very_good_analysis: ^10.0.0
+
+flutter:
+  uses-material-design: true
+
+
+  # Fuentes (respaldo local por si Google Fonts no carga)
+  fonts:
+    - family: DMSans
+      fonts:
+        - asset: assets/fonts/DMSans-Regular.ttf
+        - asset: assets/fonts/DMSans-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/DMSans-Bold.ttf
+          weight: 700

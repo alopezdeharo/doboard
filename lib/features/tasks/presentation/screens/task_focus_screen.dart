@@ -92,6 +92,7 @@ class _FocusView extends HookConsumerWidget {
           duration: const Duration(milliseconds: 350),
           child: Column(
             children: [
+              // Barra superior
               Padding(
                 padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
                 child: Row(
@@ -127,7 +128,10 @@ class _FocusView extends HookConsumerWidget {
                   ],
                 ),
               ),
+
               const Spacer(),
+
+              // Título
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 32),
                 child: Column(
@@ -142,7 +146,7 @@ class _FocusView extends HookConsumerWidget {
                       textAlign: TextAlign.center,
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 24,
+                        fontSize: 22,
                         fontWeight: FontWeight.w600,
                         letterSpacing: -0.5,
                         height: 1.3,
@@ -162,12 +166,15 @@ class _FocusView extends HookConsumerWidget {
                   ],
                 ),
               ),
-              const SizedBox(height: 48),
+
+              const SizedBox(height: 40),
+
+              // Círculo timer
               GestureDetector(
                 onTap: startPause,
                 child: SizedBox(
-                  width: 200,
-                  height: 200,
+                  width: 190,
+                  height: 190,
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
@@ -188,7 +195,7 @@ class _FocusView extends HookConsumerWidget {
                             '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}',
                             style: const TextStyle(
                               color: Colors.white,
-                              fontSize: 44,
+                              fontSize: 42,
                               fontWeight: FontWeight.w300,
                               letterSpacing: -2,
                             ),
@@ -207,39 +214,53 @@ class _FocusView extends HookConsumerWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 32),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: _TimerMode.values.map((mode) {
-                  final isActive = mode == timerMode.value;
-                  return GestureDetector(
-                    onTap: () => setMode(mode),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 160),
-                      margin: const EdgeInsets.symmetric(horizontal: 4),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 7),
-                      decoration: BoxDecoration(
-                        color: isActive ? Colors.white12 : Colors.transparent,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                            color: isActive ? Colors.white30 : Colors.white12),
-                      ),
-                      child: Text(
-                        mode.label,
-                        style: TextStyle(
-                          color: isActive ? Colors.white : Colors.white38,
-                          fontSize: 12,
-                          fontWeight: isActive
-                              ? FontWeight.w500
-                              : FontWeight.w400,
+
+              const SizedBox(height: 28),
+
+              // Selector de modo — FittedBox para adaptarse a cualquier pantalla
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: _TimerMode.values.map((mode) {
+                      final isActive = mode == timerMode.value;
+                      return GestureDetector(
+                        onTap: () => setMode(mode),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 160),
+                          margin: const EdgeInsets.symmetric(horizontal: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: isActive
+                                ? Colors.white12
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                                color:
+                                isActive ? Colors.white30 : Colors.white12),
+                          ),
+                          child: Text(
+                            mode.label,
+                            style: TextStyle(
+                              color: isActive ? Colors.white : Colors.white38,
+                              fontSize: 13,
+                              fontWeight: isActive
+                                  ? FontWeight.w500
+                                  : FontWeight.w400,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                  );
-                }).toList(),
+                      );
+                    }).toList(),
+                  ),
+                ),
               ),
+
               const Spacer(),
+
               if (task.hasSubtasks)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
@@ -267,6 +288,7 @@ class _FocusView extends HookConsumerWidget {
   };
 }
 
+// Labels cortos para caber en pantallas pequeñas
 enum _TimerMode {
   pomodoro('Pomodoro · 25m'),
   short('Descanso · 5m'),
@@ -300,25 +322,23 @@ class _FocusSubtasks extends ConsumerWidget {
               child: GestureDetector(
                 onTap: () =>
                     actions.toggleSubtaskDone(s.id, isDone: true),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 16,
-                      height: 16,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(4),
-                        border:
-                        Border.all(color: Colors.white24, width: 1.5),
-                      ),
+                child: Row(children: [
+                  Container(
+                    width: 16,
+                    height: 16,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(4),
+                      border:
+                      Border.all(color: Colors.white24, width: 1.5),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(s.title,
-                          style: const TextStyle(
-                              color: Colors.white60, fontSize: 13)),
-                    ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(s.title,
+                        style: const TextStyle(
+                            color: Colors.white60, fontSize: 13)),
+                  ),
+                ]),
               ),
             )),
           ],

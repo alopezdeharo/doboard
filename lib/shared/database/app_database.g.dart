@@ -671,6 +671,17 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, TaskData> {
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _parentTaskTitleMeta = const VerificationMeta(
+    'parentTaskTitle',
+  );
+  @override
+  late final GeneratedColumn<String> parentTaskTitle = GeneratedColumn<String>(
+    'parent_task_title',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -686,6 +697,7 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, TaskData> {
     createdAt,
     updatedAt,
     completedAt,
+    parentTaskTitle,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -790,6 +802,15 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, TaskData> {
         ),
       );
     }
+    if (data.containsKey('parent_task_title')) {
+      context.handle(
+        _parentTaskTitleMeta,
+        parentTaskTitle.isAcceptableOrUnknown(
+          data['parent_task_title']!,
+          _parentTaskTitleMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -851,6 +872,10 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, TaskData> {
         DriftSqlType.int,
         data['${effectivePrefix}completed_at'],
       ),
+      parentTaskTitle: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}parent_task_title'],
+      ),
     );
   }
 
@@ -874,6 +899,9 @@ class TaskData extends DataClass implements Insertable<TaskData> {
   final int createdAt;
   final int updatedAt;
   final int? completedAt;
+
+  /// Título de la tarea padre original (si fue promovida desde subtarea).
+  final String? parentTaskTitle;
   const TaskData({
     required this.id,
     required this.boardId,
@@ -888,6 +916,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
     required this.createdAt,
     required this.updatedAt,
     this.completedAt,
+    this.parentTaskTitle,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -910,6 +939,9 @@ class TaskData extends DataClass implements Insertable<TaskData> {
     map['updated_at'] = Variable<int>(updatedAt);
     if (!nullToAbsent || completedAt != null) {
       map['completed_at'] = Variable<int>(completedAt);
+    }
+    if (!nullToAbsent || parentTaskTitle != null) {
+      map['parent_task_title'] = Variable<String>(parentTaskTitle);
     }
     return map;
   }
@@ -935,6 +967,9 @@ class TaskData extends DataClass implements Insertable<TaskData> {
       completedAt: completedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(completedAt),
+      parentTaskTitle: parentTaskTitle == null && nullToAbsent
+          ? const Value.absent()
+          : Value(parentTaskTitle),
     );
   }
 
@@ -957,6 +992,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
       createdAt: serializer.fromJson<int>(json['createdAt']),
       updatedAt: serializer.fromJson<int>(json['updatedAt']),
       completedAt: serializer.fromJson<int?>(json['completedAt']),
+      parentTaskTitle: serializer.fromJson<String?>(json['parentTaskTitle']),
     );
   }
   @override
@@ -976,6 +1012,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
       'createdAt': serializer.toJson<int>(createdAt),
       'updatedAt': serializer.toJson<int>(updatedAt),
       'completedAt': serializer.toJson<int?>(completedAt),
+      'parentTaskTitle': serializer.toJson<String?>(parentTaskTitle),
     };
   }
 
@@ -993,6 +1030,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
     int? createdAt,
     int? updatedAt,
     Value<int?> completedAt = const Value.absent(),
+    Value<String?> parentTaskTitle = const Value.absent(),
   }) => TaskData(
     id: id ?? this.id,
     boardId: boardId ?? this.boardId,
@@ -1009,6 +1047,9 @@ class TaskData extends DataClass implements Insertable<TaskData> {
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
     completedAt: completedAt.present ? completedAt.value : this.completedAt,
+    parentTaskTitle: parentTaskTitle.present
+        ? parentTaskTitle.value
+        : this.parentTaskTitle,
   );
   TaskData copyWithCompanion(TasksCompanion data) {
     return TaskData(
@@ -1029,6 +1070,9 @@ class TaskData extends DataClass implements Insertable<TaskData> {
       completedAt: data.completedAt.present
           ? data.completedAt.value
           : this.completedAt,
+      parentTaskTitle: data.parentTaskTitle.present
+          ? data.parentTaskTitle.value
+          : this.parentTaskTitle,
     );
   }
 
@@ -1047,7 +1091,8 @@ class TaskData extends DataClass implements Insertable<TaskData> {
           ..write('detectedKeyword: $detectedKeyword, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
-          ..write('completedAt: $completedAt')
+          ..write('completedAt: $completedAt, ')
+          ..write('parentTaskTitle: $parentTaskTitle')
           ..write(')'))
         .toString();
   }
@@ -1067,6 +1112,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
     createdAt,
     updatedAt,
     completedAt,
+    parentTaskTitle,
   );
   @override
   bool operator ==(Object other) =>
@@ -1084,7 +1130,8 @@ class TaskData extends DataClass implements Insertable<TaskData> {
           other.detectedKeyword == this.detectedKeyword &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
-          other.completedAt == this.completedAt);
+          other.completedAt == this.completedAt &&
+          other.parentTaskTitle == this.parentTaskTitle);
 }
 
 class TasksCompanion extends UpdateCompanion<TaskData> {
@@ -1101,6 +1148,7 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
   final Value<int> createdAt;
   final Value<int> updatedAt;
   final Value<int?> completedAt;
+  final Value<String?> parentTaskTitle;
   final Value<int> rowid;
   const TasksCompanion({
     this.id = const Value.absent(),
@@ -1116,6 +1164,7 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.completedAt = const Value.absent(),
+    this.parentTaskTitle = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   TasksCompanion.insert({
@@ -1132,6 +1181,7 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
     required int createdAt,
     required int updatedAt,
     this.completedAt = const Value.absent(),
+    this.parentTaskTitle = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        boardId = Value(boardId),
@@ -1152,6 +1202,7 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
     Expression<int>? createdAt,
     Expression<int>? updatedAt,
     Expression<int>? completedAt,
+    Expression<String>? parentTaskTitle,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1168,6 +1219,7 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (completedAt != null) 'completed_at': completedAt,
+      if (parentTaskTitle != null) 'parent_task_title': parentTaskTitle,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1186,6 +1238,7 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
     Value<int>? createdAt,
     Value<int>? updatedAt,
     Value<int?>? completedAt,
+    Value<String?>? parentTaskTitle,
     Value<int>? rowid,
   }) {
     return TasksCompanion(
@@ -1202,6 +1255,7 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       completedAt: completedAt ?? this.completedAt,
+      parentTaskTitle: parentTaskTitle ?? this.parentTaskTitle,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1248,6 +1302,9 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
     if (completedAt.present) {
       map['completed_at'] = Variable<int>(completedAt.value);
     }
+    if (parentTaskTitle.present) {
+      map['parent_task_title'] = Variable<String>(parentTaskTitle.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1270,6 +1327,7 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('completedAt: $completedAt, ')
+          ..write('parentTaskTitle: $parentTaskTitle, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -1352,6 +1410,21 @@ class $SubtasksTable extends Subtasks
     type: DriftSqlType.int,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _isPromotedMeta = const VerificationMeta(
+    'isPromoted',
+  );
+  @override
+  late final GeneratedColumn<bool> isPromoted = GeneratedColumn<bool>(
+    'is_promoted',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_promoted" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -1360,6 +1433,7 @@ class $SubtasksTable extends Subtasks
     isDone,
     position,
     createdAt,
+    isPromoted,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1414,6 +1488,12 @@ class $SubtasksTable extends Subtasks
     } else if (isInserting) {
       context.missing(_createdAtMeta);
     }
+    if (data.containsKey('is_promoted')) {
+      context.handle(
+        _isPromotedMeta,
+        isPromoted.isAcceptableOrUnknown(data['is_promoted']!, _isPromotedMeta),
+      );
+    }
     return context;
   }
 
@@ -1447,6 +1527,10 @@ class $SubtasksTable extends Subtasks
         DriftSqlType.int,
         data['${effectivePrefix}created_at'],
       )!,
+      isPromoted: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_promoted'],
+      )!,
     );
   }
 
@@ -1463,6 +1547,10 @@ class SubtaskData extends DataClass implements Insertable<SubtaskData> {
   final bool isDone;
   final int position;
   final int createdAt;
+
+  /// Si la subtarea fue promovida a tarea en otra columna.
+  /// En ese caso se muestra como "fantasma" en la lista del padre.
+  final bool isPromoted;
   const SubtaskData({
     required this.id,
     required this.taskId,
@@ -1470,6 +1558,7 @@ class SubtaskData extends DataClass implements Insertable<SubtaskData> {
     required this.isDone,
     required this.position,
     required this.createdAt,
+    required this.isPromoted,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1480,6 +1569,7 @@ class SubtaskData extends DataClass implements Insertable<SubtaskData> {
     map['is_done'] = Variable<bool>(isDone);
     map['position'] = Variable<int>(position);
     map['created_at'] = Variable<int>(createdAt);
+    map['is_promoted'] = Variable<bool>(isPromoted);
     return map;
   }
 
@@ -1491,6 +1581,7 @@ class SubtaskData extends DataClass implements Insertable<SubtaskData> {
       isDone: Value(isDone),
       position: Value(position),
       createdAt: Value(createdAt),
+      isPromoted: Value(isPromoted),
     );
   }
 
@@ -1506,6 +1597,7 @@ class SubtaskData extends DataClass implements Insertable<SubtaskData> {
       isDone: serializer.fromJson<bool>(json['isDone']),
       position: serializer.fromJson<int>(json['position']),
       createdAt: serializer.fromJson<int>(json['createdAt']),
+      isPromoted: serializer.fromJson<bool>(json['isPromoted']),
     );
   }
   @override
@@ -1518,6 +1610,7 @@ class SubtaskData extends DataClass implements Insertable<SubtaskData> {
       'isDone': serializer.toJson<bool>(isDone),
       'position': serializer.toJson<int>(position),
       'createdAt': serializer.toJson<int>(createdAt),
+      'isPromoted': serializer.toJson<bool>(isPromoted),
     };
   }
 
@@ -1528,6 +1621,7 @@ class SubtaskData extends DataClass implements Insertable<SubtaskData> {
     bool? isDone,
     int? position,
     int? createdAt,
+    bool? isPromoted,
   }) => SubtaskData(
     id: id ?? this.id,
     taskId: taskId ?? this.taskId,
@@ -1535,6 +1629,7 @@ class SubtaskData extends DataClass implements Insertable<SubtaskData> {
     isDone: isDone ?? this.isDone,
     position: position ?? this.position,
     createdAt: createdAt ?? this.createdAt,
+    isPromoted: isPromoted ?? this.isPromoted,
   );
   SubtaskData copyWithCompanion(SubtasksCompanion data) {
     return SubtaskData(
@@ -1544,6 +1639,9 @@ class SubtaskData extends DataClass implements Insertable<SubtaskData> {
       isDone: data.isDone.present ? data.isDone.value : this.isDone,
       position: data.position.present ? data.position.value : this.position,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      isPromoted: data.isPromoted.present
+          ? data.isPromoted.value
+          : this.isPromoted,
     );
   }
 
@@ -1555,14 +1653,15 @@ class SubtaskData extends DataClass implements Insertable<SubtaskData> {
           ..write('title: $title, ')
           ..write('isDone: $isDone, ')
           ..write('position: $position, ')
-          ..write('createdAt: $createdAt')
+          ..write('createdAt: $createdAt, ')
+          ..write('isPromoted: $isPromoted')
           ..write(')'))
         .toString();
   }
 
   @override
   int get hashCode =>
-      Object.hash(id, taskId, title, isDone, position, createdAt);
+      Object.hash(id, taskId, title, isDone, position, createdAt, isPromoted);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1572,7 +1671,8 @@ class SubtaskData extends DataClass implements Insertable<SubtaskData> {
           other.title == this.title &&
           other.isDone == this.isDone &&
           other.position == this.position &&
-          other.createdAt == this.createdAt);
+          other.createdAt == this.createdAt &&
+          other.isPromoted == this.isPromoted);
 }
 
 class SubtasksCompanion extends UpdateCompanion<SubtaskData> {
@@ -1582,6 +1682,7 @@ class SubtasksCompanion extends UpdateCompanion<SubtaskData> {
   final Value<bool> isDone;
   final Value<int> position;
   final Value<int> createdAt;
+  final Value<bool> isPromoted;
   final Value<int> rowid;
   const SubtasksCompanion({
     this.id = const Value.absent(),
@@ -1590,6 +1691,7 @@ class SubtasksCompanion extends UpdateCompanion<SubtaskData> {
     this.isDone = const Value.absent(),
     this.position = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.isPromoted = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   SubtasksCompanion.insert({
@@ -1599,6 +1701,7 @@ class SubtasksCompanion extends UpdateCompanion<SubtaskData> {
     this.isDone = const Value.absent(),
     this.position = const Value.absent(),
     required int createdAt,
+    this.isPromoted = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        taskId = Value(taskId),
@@ -1611,6 +1714,7 @@ class SubtasksCompanion extends UpdateCompanion<SubtaskData> {
     Expression<bool>? isDone,
     Expression<int>? position,
     Expression<int>? createdAt,
+    Expression<bool>? isPromoted,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1620,6 +1724,7 @@ class SubtasksCompanion extends UpdateCompanion<SubtaskData> {
       if (isDone != null) 'is_done': isDone,
       if (position != null) 'position': position,
       if (createdAt != null) 'created_at': createdAt,
+      if (isPromoted != null) 'is_promoted': isPromoted,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1631,6 +1736,7 @@ class SubtasksCompanion extends UpdateCompanion<SubtaskData> {
     Value<bool>? isDone,
     Value<int>? position,
     Value<int>? createdAt,
+    Value<bool>? isPromoted,
     Value<int>? rowid,
   }) {
     return SubtasksCompanion(
@@ -1640,6 +1746,7 @@ class SubtasksCompanion extends UpdateCompanion<SubtaskData> {
       isDone: isDone ?? this.isDone,
       position: position ?? this.position,
       createdAt: createdAt ?? this.createdAt,
+      isPromoted: isPromoted ?? this.isPromoted,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1665,6 +1772,9 @@ class SubtasksCompanion extends UpdateCompanion<SubtaskData> {
     if (createdAt.present) {
       map['created_at'] = Variable<int>(createdAt.value);
     }
+    if (isPromoted.present) {
+      map['is_promoted'] = Variable<bool>(isPromoted.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1680,6 +1790,7 @@ class SubtasksCompanion extends UpdateCompanion<SubtaskData> {
           ..write('isDone: $isDone, ')
           ..write('position: $position, ')
           ..write('createdAt: $createdAt, ')
+          ..write('isPromoted: $isPromoted, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -2513,6 +2624,7 @@ typedef $$TasksTableCreateCompanionBuilder =
       required int createdAt,
       required int updatedAt,
       Value<int?> completedAt,
+      Value<String?> parentTaskTitle,
       Value<int> rowid,
     });
 typedef $$TasksTableUpdateCompanionBuilder =
@@ -2530,6 +2642,7 @@ typedef $$TasksTableUpdateCompanionBuilder =
       Value<int> createdAt,
       Value<int> updatedAt,
       Value<int?> completedAt,
+      Value<String?> parentTaskTitle,
       Value<int> rowid,
     });
 
@@ -2658,6 +2771,11 @@ class $$TasksTableFilterComposer extends Composer<_$AppDatabase, $TasksTable> {
 
   ColumnFilters<int> get completedAt => $composableBuilder(
     column: $table.completedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get parentTaskTitle => $composableBuilder(
+    column: $table.parentTaskTitle,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2804,6 +2922,11 @@ class $$TasksTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get parentTaskTitle => $composableBuilder(
+    column: $table.parentTaskTitle,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$BoardsTableOrderingComposer get boardId {
     final $$BoardsTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -2874,6 +2997,11 @@ class $$TasksTableAnnotationComposer
 
   GeneratedColumn<int> get completedAt => $composableBuilder(
     column: $table.completedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get parentTaskTitle => $composableBuilder(
+    column: $table.parentTaskTitle,
     builder: (column) => column,
   );
 
@@ -2996,6 +3124,7 @@ class $$TasksTableTableManager
                 Value<int> createdAt = const Value.absent(),
                 Value<int> updatedAt = const Value.absent(),
                 Value<int?> completedAt = const Value.absent(),
+                Value<String?> parentTaskTitle = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => TasksCompanion(
                 id: id,
@@ -3011,6 +3140,7 @@ class $$TasksTableTableManager
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 completedAt: completedAt,
+                parentTaskTitle: parentTaskTitle,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -3028,6 +3158,7 @@ class $$TasksTableTableManager
                 required int createdAt,
                 required int updatedAt,
                 Value<int?> completedAt = const Value.absent(),
+                Value<String?> parentTaskTitle = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => TasksCompanion.insert(
                 id: id,
@@ -3043,6 +3174,7 @@ class $$TasksTableTableManager
                 createdAt: createdAt,
                 updatedAt: updatedAt,
                 completedAt: completedAt,
+                parentTaskTitle: parentTaskTitle,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -3161,6 +3293,7 @@ typedef $$SubtasksTableCreateCompanionBuilder =
       Value<bool> isDone,
       Value<int> position,
       required int createdAt,
+      Value<bool> isPromoted,
       Value<int> rowid,
     });
 typedef $$SubtasksTableUpdateCompanionBuilder =
@@ -3171,6 +3304,7 @@ typedef $$SubtasksTableUpdateCompanionBuilder =
       Value<bool> isDone,
       Value<int> position,
       Value<int> createdAt,
+      Value<bool> isPromoted,
       Value<int> rowid,
     });
 
@@ -3228,6 +3362,11 @@ class $$SubtasksTableFilterComposer
 
   ColumnFilters<int> get createdAt => $composableBuilder(
     column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isPromoted => $composableBuilder(
+    column: $table.isPromoted,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -3289,6 +3428,11 @@ class $$SubtasksTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get isPromoted => $composableBuilder(
+    column: $table.isPromoted,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$TasksTableOrderingComposer get taskId {
     final $$TasksTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -3336,6 +3480,11 @@ class $$SubtasksTableAnnotationComposer
 
   GeneratedColumn<int> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<bool> get isPromoted => $composableBuilder(
+    column: $table.isPromoted,
+    builder: (column) => column,
+  );
 
   $$TasksTableAnnotationComposer get taskId {
     final $$TasksTableAnnotationComposer composer = $composerBuilder(
@@ -3395,6 +3544,7 @@ class $$SubtasksTableTableManager
                 Value<bool> isDone = const Value.absent(),
                 Value<int> position = const Value.absent(),
                 Value<int> createdAt = const Value.absent(),
+                Value<bool> isPromoted = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SubtasksCompanion(
                 id: id,
@@ -3403,6 +3553,7 @@ class $$SubtasksTableTableManager
                 isDone: isDone,
                 position: position,
                 createdAt: createdAt,
+                isPromoted: isPromoted,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -3413,6 +3564,7 @@ class $$SubtasksTableTableManager
                 Value<bool> isDone = const Value.absent(),
                 Value<int> position = const Value.absent(),
                 required int createdAt,
+                Value<bool> isPromoted = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SubtasksCompanion.insert(
                 id: id,
@@ -3421,6 +3573,7 @@ class $$SubtasksTableTableManager
                 isDone: isDone,
                 position: position,
                 createdAt: createdAt,
+                isPromoted: isPromoted,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

@@ -35,6 +35,8 @@ abstract interface class ITaskRepository {
 
   Future<void> clearCompleted(String boardId);
 
+  Future<int> countPendingByBoard(String boardId);
+
   Future<void> duplicateTask(String taskId);
 
   // ─── Subtareas ─────────────────────────────────────────────────────────────

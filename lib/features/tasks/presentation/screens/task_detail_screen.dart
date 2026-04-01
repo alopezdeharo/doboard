@@ -10,14 +10,16 @@ import '../../domain/entities/task.dart';
 import '../../domain/entities/priority.dart';
 import '../../domain/entities/subtask.dart';
 import '../providers/tasks_provider.dart';
-import '../../../boards/presentation/providers/boards_provider.dart';
 
-// Provider a nivel de archivo — sin @riverpod
-final taskByIdProvider = FutureProvider.family<Task?, String>((ref, taskId) {
-  return ref.watch(taskRepositoryProvider).getTaskById(taskId);
+// autoDispose garantiza que al cerrar la pantalla el provider se descarta,
+// y al reabrirla siempre obtiene datos frescos de la DB.
+// No hace falta invalidar manualmente desde useEffect.
+final taskByIdProvider =
+FutureProvider.autoDispose.family<Task?, String>((ref, taskId) {
+  return ref.read(taskRepositoryProvider).getTaskById(taskId);
 });
 
-class TaskDetailScreen extends HookConsumerWidget {
+class TaskDetailScreen extends ConsumerWidget {
   const TaskDetailScreen({super.key, required this.taskId});
   final String taskId;
 
@@ -57,7 +59,9 @@ class _TaskDetailView extends HookConsumerWidget {
 
     void saveTitle() {
       final v = titleCtrl.text.trim();
-      if (v.isNotEmpty && v != task.title) actions.updateTask(task.copyWith(title: v));
+      if (v.isNotEmpty && v != task.title) {
+        actions.updateTask(task.copyWith(title: v));
+      }
       isEditingTitle.value = false;
     }
 
@@ -65,6 +69,14 @@ class _TaskDetailView extends HookConsumerWidget {
       final v = contentCtrl.text.trim();
       actions.updateTask(task.copyWith(content: v.isEmpty ? null : v));
       isEditingContent.value = false;
+      // Refrescar la vista invalidando el provider tras guardar
+      ref.invalidate(taskByIdProvider(task.id));
+    }
+
+    void setPriority(Priority p) {
+      selectedPriority.value = p;
+      actions.updateTask(task.copyWith(priority: p));
+      ref.invalidate(taskByIdProvider(task.id));
     }
 
     return Scaffold(
@@ -82,9 +94,12 @@ class _TaskDetailView extends HookConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (task.isFrog) ...[_FrogBanner(), const SizedBox(height: 12)],
+                      if (task.isFrog) ...[
+                        _FrogBanner(),
+                        const SizedBox(height: 12),
+                      ],
 
-                      // Título editable
+                      // ── Título editable ────────────────────────────
                       GestureDetector(
                         onTap: () => isEditingTitle.value = true,
                         child: isEditingTitle.value
@@ -92,8 +107,10 @@ class _TaskDetailView extends HookConsumerWidget {
                           controller: titleCtrl,
                           autofocus: true,
                           onSubmitted: (_) => saveTitle(),
+                          onTapOutside: (_) => saveTitle(),
                           style: theme.textTheme.titleMedium?.copyWith(
-                              fontSize: 22, fontWeight: FontWeight.w600),
+                              fontSize: 22,
+                              fontWeight: FontWeight.w600),
                           decoration: const InputDecoration(
                               border: InputBorder.none,
                               isDense: true,
@@ -101,30 +118,31 @@ class _TaskDetailView extends HookConsumerWidget {
                         )
                             : Text(task.title,
                             style: theme.textTheme.titleMedium?.copyWith(
-                              fontSize: 22, fontWeight: FontWeight.w600,
-                              decoration: task.isDone ? TextDecoration.lineThrough : null,
+                              fontSize: 22,
+                              fontWeight: FontWeight.w600,
+                              decoration: task.isDone
+                                  ? TextDecoration.lineThrough
+                                  : null,
                             )),
                       ),
                       const SizedBox(height: 16),
 
-                      // Prioridad
+                      // ── Selector de prioridad ──────────────────────
                       _PrioritySelector(
                         selected: selectedPriority.value,
-                        onSelect: (p) {
-                          selectedPriority.value = p;
-                          actions.updateTask(task.copyWith(priority: p));
-                        },
+                        onSelect: setPriority,
                       ),
                       const SizedBox(height: 20),
 
-                      // Descripción
+                      // ── Descripción editable ───────────────────────
                       GestureDetector(
                         onTap: () => isEditingContent.value = true,
                         child: Container(
                           width: double.infinity,
                           padding: const EdgeInsets.all(14),
                           decoration: BoxDecoration(
-                            color: theme.colorScheme.surfaceVariant.withOpacity(0.4),
+                            color: theme.colorScheme.surfaceVariant
+                                .withOpacity(0.4),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: isEditingContent.value
@@ -133,35 +151,40 @@ class _TaskDetailView extends HookConsumerWidget {
                             autofocus: true,
                             maxLines: null,
                             onTapOutside: (_) => saveContent(),
-                            style: theme.textTheme.bodyMedium,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.onSurface),
                             decoration: InputDecoration(
                               hintText: 'Añade una descripción...',
                               border: InputBorder.none,
                               isDense: true,
                               contentPadding: EdgeInsets.zero,
-                              hintStyle: theme.textTheme.bodyMedium?.copyWith(
-                                  color: theme.colorScheme.onSurface.withOpacity(0.35)),
+                              hintStyle: theme.textTheme.bodyMedium
+                                  ?.copyWith(
+                                  color: theme.colorScheme.onSurface
+                                      .withOpacity(0.35)),
                             ),
                           )
                               : Text(
-                            task.content?.isNotEmpty == true
-                                ? task.content!
+                            contentCtrl.text.isNotEmpty
+                                ? contentCtrl.text
                                 : 'Toca para añadir descripción...',
                             style: theme.textTheme.bodyMedium?.copyWith(
-                              color: task.content?.isNotEmpty == true
+                              color: contentCtrl.text.isNotEmpty
                                   ? theme.colorScheme.onSurface
-                                  : theme.colorScheme.onSurface.withOpacity(0.35),
+                                  : theme.colorScheme.onSurface
+                                  .withOpacity(0.35),
                             ),
                           ),
                         ),
                       ),
                       const SizedBox(height: 24),
 
-                      // Nota rápida
-                      _NoteShortcut(taskId: task.id, hasNote: task.hasNote),
+                      // ── Nota ──────────────────────────────────────
+                      _NoteShortcut(
+                          taskId: task.id, hasNote: task.hasNote),
                       const SizedBox(height: 24),
 
-                      // Subtareas
+                      // ── Subtareas ──────────────────────────────────
                       _SubtaskSection(task: task),
                     ],
                   ),
@@ -175,6 +198,8 @@ class _TaskDetailView extends HookConsumerWidget {
   }
 }
 
+// ─── AppBar ───────────────────────────────────────────────────────────────────
+
 class _DetailAppBar extends ConsumerWidget {
   const _DetailAppBar({required this.task});
   final Task task;
@@ -185,62 +210,68 @@ class _DetailAppBar extends ConsumerWidget {
     final actions = ref.read(taskActionsProvider.notifier);
     return Padding(
       padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
-      child: Row(
-        children: [
-          IconButton(
-            icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 28),
-            color: theme.colorScheme.onSurface.withOpacity(0.5),
-            onPressed: () => context.pop(),
-          ),
-          const Spacer(),
-          IconButton(
-            icon: const Icon(Icons.center_focus_strong_rounded, size: 20),
-            color: theme.colorScheme.onSurface.withOpacity(0.5),
-            onPressed: () => context.push('/task/${task.id}/focus'),
-          ),
-          IconButton(
-            icon: Icon(task.isDone
+      child: Row(children: [
+        IconButton(
+          icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 28),
+          color: theme.colorScheme.onSurface.withOpacity(0.5),
+          onPressed: () => context.pop(),
+        ),
+        const Spacer(),
+        IconButton(
+          icon: const Icon(Icons.center_focus_strong_rounded, size: 20),
+          color: theme.colorScheme.onSurface.withOpacity(0.5),
+          onPressed: () => context.push('/task/${task.id}/focus'),
+        ),
+        IconButton(
+          icon: Icon(
+            task.isDone
                 ? Icons.check_circle_rounded
-                : Icons.check_circle_outline_rounded, size: 22),
-            color: task.isDone
-                ? theme.colorScheme.primary
-                : theme.colorScheme.onSurface.withOpacity(0.5),
-            onPressed: () {
-              HapticFeedback.mediumImpact();
-              actions.toggleDone(task.id, isDone: !task.isDone);
-              if (!task.isDone) context.pop();
-            },
+                : Icons.check_circle_outline_rounded,
+            size: 22,
           ),
-          IconButton(
-            icon: const Icon(Icons.delete_outline_rounded, size: 20),
-            color: theme.colorScheme.error.withOpacity(0.7),
-            onPressed: () async {
-              final ok = await showDialog<bool>(
-                context: context,
-                builder: (_) => AlertDialog(
-                  title: const Text('¿Eliminar tarea?'),
-                  content: const Text('Esta acción no se puede deshacer.'),
-                  actions: [
-                    TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
-                    FilledButton(
-                      style: FilledButton.styleFrom(backgroundColor: theme.colorScheme.error),
-                      onPressed: () => Navigator.pop(context, true),
-                      child: const Text('Eliminar'),
-                    ),
-                  ],
-                ),
-              );
-              if (ok == true) {
-                actions.deleteTask(task.id);
-                if (context.mounted) context.pop();
-              }
-            },
-          ),
-        ],
-      ),
+          color: task.isDone
+              ? theme.colorScheme.primary
+              : theme.colorScheme.onSurface.withOpacity(0.5),
+          onPressed: () {
+            HapticFeedback.mediumImpact();
+            actions.toggleDone(task.id, isDone: !task.isDone);
+            if (!task.isDone) context.pop();
+          },
+        ),
+        IconButton(
+          icon: const Icon(Icons.delete_outline_rounded, size: 20),
+          color: theme.colorScheme.error.withOpacity(0.7),
+          onPressed: () async {
+            final ok = await showDialog<bool>(
+              context: context,
+              builder: (_) => AlertDialog(
+                title: const Text('¿Eliminar tarea?'),
+                content: const Text('Esta acción no se puede deshacer.'),
+                actions: [
+                  TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text('Cancelar')),
+                  FilledButton(
+                    style: FilledButton.styleFrom(
+                        backgroundColor: theme.colorScheme.error),
+                    onPressed: () => Navigator.pop(context, true),
+                    child: const Text('Eliminar'),
+                  ),
+                ],
+              ),
+            );
+            if (ok == true) {
+              actions.deleteTask(task.id);
+              if (context.mounted) context.pop();
+            }
+          },
+        ),
+      ]),
     );
   }
 }
+
+// ─── Selector de prioridad ────────────────────────────────────────────────────
 
 class _PrioritySelector extends StatelessWidget {
   const _PrioritySelector({required this.selected, required this.onSelect});
@@ -259,28 +290,37 @@ class _PrioritySelector extends StatelessWidget {
             onTap: () => onSelect(p),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 160),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              padding:
+              const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: isSelected ? color.withOpacity(0.15) : Colors.transparent,
+                color: isSelected
+                    ? color.withOpacity(0.15)
+                    : Colors.transparent,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                     color: isSelected ? color : color.withOpacity(0.3),
                     width: isSelected ? 1.5 : 1),
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                      width: 8, height: 8,
-                      decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-                  const SizedBox(width: 6),
-                  Text(_label(p),
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: isSelected ? color : Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
-                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                      )),
-                ],
-              ),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                        color: color, shape: BoxShape.circle)),
+                const SizedBox(width: 6),
+                Text(_label(p),
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: isSelected
+                          ? color
+                          : Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withOpacity(0.5),
+                      fontWeight: isSelected
+                          ? FontWeight.w600
+                          : FontWeight.w400,
+                    )),
+              ]),
             ),
           ),
         );
@@ -291,7 +331,8 @@ class _PrioritySelector extends StatelessWidget {
   Color _color(Priority p, BuildContext ctx) => switch (p) {
     Priority.high => const Color(0xFFE24B4A),
     Priority.medium => const Color(0xFFEF9F27),
-    Priority.low => Theme.of(ctx).colorScheme.onSurface.withOpacity(0.3),
+    Priority.low =>
+        Theme.of(ctx).colorScheme.onSurface.withOpacity(0.3),
   };
 
   String _label(Priority p) => switch (p) {
@@ -300,6 +341,8 @@ class _PrioritySelector extends StatelessWidget {
     Priority.low => 'Normal',
   };
 }
+
+// ─── Acceso a nota ────────────────────────────────────────────────────────────
 
 class _NoteShortcut extends StatelessWidget {
   const _NoteShortcut({required this.taskId, required this.hasNote});
@@ -326,22 +369,31 @@ class _NoteShortcut extends StatelessWidget {
           ),
         ),
         child: Row(children: [
-          Icon(hasNote ? Icons.sticky_note_2_rounded : Icons.add_comment_outlined,
-              size: 18,
+          Icon(
+            hasNote
+                ? Icons.sticky_note_2_rounded
+                : Icons.add_comment_outlined,
+            size: 18,
+            color: hasNote
+                ? theme.colorScheme.secondary
+                : theme.colorScheme.onSurface.withOpacity(0.4),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            hasNote ? 'Ver nota completa →' : 'Añadir nota extensa...',
+            style: theme.textTheme.bodyMedium?.copyWith(
               color: hasNote
                   ? theme.colorScheme.secondary
-                  : theme.colorScheme.onSurface.withOpacity(0.4)),
-          const SizedBox(width: 10),
-          Text(hasNote ? 'Ver nota completa →' : 'Añadir nota extensa...',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                  color: hasNote
-                      ? theme.colorScheme.secondary
-                      : theme.colorScheme.onSurface.withOpacity(0.4))),
+                  : theme.colorScheme.onSurface.withOpacity(0.4),
+            ),
+          ),
         ]),
       ),
     );
   }
 }
+
+// ─── Sección de subtareas ─────────────────────────────────────────────────────
 
 class _SubtaskSection extends HookConsumerWidget {
   const _SubtaskSection({required this.task});
@@ -358,12 +410,16 @@ class _SubtaskSection extends HookConsumerWidget {
 
     Future<void> addSubtask() async {
       final title = inputCtrl.text.trim();
-      if (title.isEmpty) { isAdding.value = false; return; }
+      if (title.isEmpty) {
+        isAdding.value = false;
+        return;
+      }
       await actions.createSubtask(taskId: task.id, title: title);
       inputCtrl.clear();
     }
 
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      // Cabecera colapsable
       GestureDetector(
         onTap: () => isCollapsed.value = !isCollapsed.value,
         child: Row(children: [
@@ -372,22 +428,29 @@ class _SubtaskSection extends HookConsumerWidget {
                   color: theme.colorScheme.onSurface.withOpacity(0.6),
                   fontWeight: FontWeight.w600)),
           subtasksAsync.maybeWhen(
-              data: (subs) => subs.isEmpty ? const SizedBox.shrink()
-                  : Padding(padding: const EdgeInsets.only(left: 6),
-                  child: Text('${subs.where((s) => s.isDone).length}/${subs.length}',
-                      style: theme.textTheme.labelSmall?.copyWith(
-                          color: theme.colorScheme.onSurface.withOpacity(0.4)))),
-              orElse: () => const SizedBox.shrink()),
+            data: (subs) => subs.isEmpty
+                ? const SizedBox.shrink()
+                : Padding(
+                padding: const EdgeInsets.only(left: 6),
+                child: Text(
+                    '${subs.where((s) => s.isDone && !s.isPromoted).length}/${subs.where((s) => !s.isPromoted).length}',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.onSurface
+                            .withOpacity(0.4)))),
+            orElse: () => const SizedBox.shrink(),
+          ),
           const Spacer(),
           AnimatedRotation(
             duration: const Duration(milliseconds: 200),
             turns: isCollapsed.value ? -0.25 : 0,
-            child: Icon(Icons.expand_less_rounded, size: 18,
+            child: Icon(Icons.expand_less_rounded,
+                size: 18,
                 color: theme.colorScheme.onSurface.withOpacity(0.4)),
           ),
         ]),
       ),
       const SizedBox(height: 8),
+
       AnimatedSize(
         duration: const Duration(milliseconds: 220),
         curve: Curves.easeOutCubic,
@@ -398,30 +461,44 @@ class _SubtaskSection extends HookConsumerWidget {
             loading: () => const SizedBox.shrink(),
             error: (_, __) => const SizedBox.shrink(),
             data: (subs) => Column(
-                children: subs.map((s) => _SubtaskItem(
-                    subtask: s, taskId: task.id, boardId: task.boardId)).toList()),
+                children: subs
+                    .map((s) => _SubtaskItem(
+                    subtask: s,
+                    taskId: task.id,
+                    boardId: task.boardId))
+                    .toList()),
           ),
           if (isAdding.value) ...[
             const SizedBox(height: 4),
             Row(children: [
-              Container(width: 18, height: 18, margin: const EdgeInsets.only(right: 10),
+              Container(
+                  width: 18,
+                  height: 18,
+                  margin: const EdgeInsets.only(right: 10),
                   decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(5),
                       border: Border.all(
-                          color: theme.colorScheme.outline.withOpacity(0.4),
+                          color: theme.colorScheme.outline
+                              .withOpacity(0.4),
                           width: 1.5))),
               Expanded(
                 child: TextField(
-                  controller: inputCtrl, autofocus: true,
+                  controller: inputCtrl,
+                  autofocus: true,
                   onSubmitted: (_) => addSubtask(),
-                  onTapOutside: (_) { addSubtask(); isAdding.value = false; },
+                  onTapOutside: (_) {
+                    addSubtask();
+                    isAdding.value = false;
+                  },
                   style: theme.textTheme.bodyMedium,
                   decoration: InputDecoration(
                     hintText: 'Nueva subtarea...',
-                    border: InputBorder.none, isDense: true,
+                    border: InputBorder.none,
+                    isDense: true,
                     contentPadding: EdgeInsets.zero,
                     hintStyle: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurface.withOpacity(0.35)),
+                        color: theme.colorScheme.onSurface
+                            .withOpacity(0.35)),
                   ),
                 ),
               ),
@@ -431,12 +508,15 @@ class _SubtaskSection extends HookConsumerWidget {
           GestureDetector(
             onTap: () => isAdding.value = true,
             child: Row(children: [
-              Icon(Icons.add_rounded, size: 16,
-                  color: theme.colorScheme.onSurface.withOpacity(0.35)),
+              Icon(Icons.add_rounded,
+                  size: 16,
+                  color:
+                  theme.colorScheme.onSurface.withOpacity(0.35)),
               const SizedBox(width: 6),
               Text('Añadir subtarea',
                   style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurface.withOpacity(0.4))),
+                      color: theme.colorScheme.onSurface
+                          .withOpacity(0.4))),
             ]),
           ),
         ]),
@@ -445,8 +525,11 @@ class _SubtaskSection extends HookConsumerWidget {
   }
 }
 
+// ─── Fila de subtarea ─────────────────────────────────────────────────────────
+
 class _SubtaskItem extends ConsumerWidget {
-  const _SubtaskItem({required this.subtask, required this.taskId, required this.boardId});
+  const _SubtaskItem(
+      {required this.subtask, required this.taskId, required this.boardId});
   final Subtask subtask;
   final String taskId;
   final String boardId;
@@ -455,56 +538,102 @@ class _SubtaskItem extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final actions = ref.read(taskActionsProvider.notifier);
+    final isPromoted = subtask.isPromoted;
+
     return Dismissible(
       key: ValueKey(subtask.id),
-      direction: DismissDirection.endToStart,
+      direction:
+      isPromoted ? DismissDirection.none : DismissDirection.endToStart,
       background: Container(
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 16),
         decoration: BoxDecoration(
             color: theme.colorScheme.error.withOpacity(0.1),
             borderRadius: BorderRadius.circular(8)),
-        child: Icon(Icons.delete_outline_rounded, color: theme.colorScheme.error, size: 18),
+        child: Icon(Icons.delete_outline_rounded,
+            color: theme.colorScheme.error, size: 18),
       ),
       onDismissed: (_) => actions.deleteSubtask(subtask.id),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 5),
         child: Row(children: [
           GestureDetector(
-            onTap: () {
+            onTap: isPromoted
+                ? null
+                : () {
               HapticFeedback.selectionClick();
-              actions.toggleSubtaskDone(subtask.id, isDone: !subtask.isDone);
+              actions.toggleSubtaskDone(subtask.id,
+                  isDone: !subtask.isDone);
             },
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 160),
-              width: 18, height: 18,
+              width: 18,
+              height: 18,
               decoration: BoxDecoration(
-                color: subtask.isDone ? theme.colorScheme.primary : Colors.transparent,
+                color: isPromoted
+                    ? Colors.transparent
+                    : subtask.isDone
+                    ? theme.colorScheme.primary
+                    : Colors.transparent,
                 borderRadius: BorderRadius.circular(5),
                 border: Border.all(
-                    color: subtask.isDone
-                        ? theme.colorScheme.primary
-                        : theme.colorScheme.outline.withOpacity(0.4),
-                    width: 1.5),
+                  color: isPromoted
+                      ? theme.colorScheme.outline.withOpacity(0.2)
+                      : subtask.isDone
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.outline.withOpacity(0.4),
+                  width: 1.5,
+                ),
               ),
-              child: subtask.isDone
-                  ? Icon(Icons.check_rounded, size: 11, color: theme.colorScheme.onPrimary)
+              child: isPromoted
+                  ? Icon(Icons.open_in_new_rounded,
+                  size: 10,
+                  color: theme.colorScheme.onSurface.withOpacity(0.25))
+                  : subtask.isDone
+                  ? Icon(Icons.check_rounded,
+                  size: 11, color: theme.colorScheme.onPrimary)
                   : null,
             ),
           ),
           const SizedBox(width: 10),
-          Expanded(child: Text(subtask.title,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: subtask.isDone ? theme.colorScheme.onSurface.withOpacity(0.35) : null,
-                decoration: subtask.isDone ? TextDecoration.lineThrough : null,
-              ))),
-          GestureDetector(
-            onTap: () => actions.promoteSubtask(
-                subtaskId: subtask.id, parentTaskId: taskId, targetBoardId: boardId),
-            child: Padding(padding: const EdgeInsets.all(6),
-                child: Icon(Icons.open_in_new_rounded, size: 14,
-                    color: theme.colorScheme.onSurface.withOpacity(0.25))),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(subtask.title,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: isPromoted
+                          ? theme.colorScheme.onSurface.withOpacity(0.3)
+                          : subtask.isDone
+                          ? theme.colorScheme.onSurface.withOpacity(0.35)
+                          : null,
+                      decoration: subtask.isDone && !isPromoted
+                          ? TextDecoration.lineThrough
+                          : null,
+                    )),
+                if (isPromoted)
+                  Text('↳ movida a otra columna',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        fontSize: 10,
+                        color: theme.colorScheme.onSurface.withOpacity(0.25),
+                        fontStyle: FontStyle.italic,
+                      )),
+              ],
+            ),
           ),
+          if (!isPromoted)
+            GestureDetector(
+              onTap: () => actions.promoteSubtask(
+                  subtaskId: subtask.id,
+                  parentTaskId: taskId,
+                  targetBoardId: boardId),
+              child: Padding(
+                padding: const EdgeInsets.all(6),
+                child: Icon(Icons.open_in_new_rounded,
+                    size: 14,
+                    color: theme.colorScheme.onSurface.withOpacity(0.25)),
+              ),
+            ),
         ]),
       ),
     );
@@ -525,7 +654,8 @@ class _FrogBanner extends StatelessWidget {
         const SizedBox(width: 8),
         Text('Esta es tu tarea más importante hoy',
             style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.primary, fontWeight: FontWeight.w500)),
+                color: theme.colorScheme.primary,
+                fontWeight: FontWeight.w500)),
       ]),
     );
   }

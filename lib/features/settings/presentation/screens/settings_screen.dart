@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/providers/repository_providers.dart';
 import '../../../../core/utils/automation_engine.dart';
 import '../../../../features/boards/domain/entities/board.dart';
 import '../../../../features/boards/presentation/providers/boards_provider.dart';
@@ -163,9 +164,39 @@ class _BoardVisibilitySection extends ConsumerWidget {
                 label: e.value.name,
                 subtitle: e.value.subtitle,
                 value: e.value.isVisible,
-                onChanged: (v) => ref
-                    .read(boardRepositoryProvider)
-                    .toggleVisibility(e.value.id, isVisible: v),
+                onChanged: (v) async {
+                  // Si está ocultando (v=false), comprobar si tiene tareas
+                  if (!v) {
+                    final taskCount = await ref
+                        .read(taskRepositoryProvider)
+                        .countPendingByBoard(e.value.id);
+                    if (taskCount > 0 && context.mounted) {
+                      final confirmed = await showDialog<bool>(
+                        context: context,
+                        builder: (_) => AlertDialog(
+                          title: Text('Ocultar ${e.value.name}'),
+                          content: Text(
+                            'Este tablero tiene $taskCount tarea${taskCount == 1 ? '' : 's'} pendiente${taskCount == 1 ? '' : 's'}.\n\n'
+                                'Las tareas se conservarán pero no serán visibles hasta que vuelvas a mostrar el tablero.',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, false),
+                              child: const Text('Cancelar'),
+                            ),
+                            FilledButton(
+                              onPressed: () => Navigator.pop(context, true),
+                              child: const Text('Ocultar igualmente'),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirmed != true) return;
+                    }
+                  }
+                  ref.read(boardRepositoryProvider)
+                      .toggleVisibility(e.value.id, isVisible: v);
+                },
               ),
               if (e.key < boards.length - 1) _Divider(),
             ],
@@ -559,3 +590,6 @@ class _Divider extends StatelessWidget {
     );
   }
 }
+
+// ─── Extensión: visibilidad con aviso ────────────────────────────────────────
+// (Añadir en _BoardVisibilitySection.onChanged)

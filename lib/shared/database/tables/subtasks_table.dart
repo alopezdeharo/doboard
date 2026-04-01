@@ -11,6 +11,9 @@ class Subtasks extends Table {
   BoolColumn get isDone => boolean().withDefault(const Constant(false))();
   IntColumn get position => integer().withDefault(const Constant(0))();
   IntColumn get createdAt => integer()();
+  /// Si la subtarea fue promovida a tarea en otra columna.
+  /// En ese caso se muestra como "fantasma" en la lista del padre.
+  BoolColumn get isPromoted => boolean().withDefault(const Constant(false))();
 
   @override
   Set<Column> get primaryKey => {id};

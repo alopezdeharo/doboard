@@ -18,6 +18,8 @@ class Tasks extends Table {
   IntColumn get createdAt => integer()();
   IntColumn get updatedAt => integer()();
   IntColumn get completedAt => integer().nullable()();
+  /// Título de la tarea padre original (si fue promovida desde subtarea).
+  TextColumn get parentTaskTitle => text().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};

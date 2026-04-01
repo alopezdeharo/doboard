@@ -1,4 +1,3 @@
-import 'package:doboard/core/utils/automation_engine.dart';
 import 'package:doboard/features/tasks/domain/entities/priority.dart';
 import 'package:doboard/features/tasks/domain/entities/subtask.dart';
 import 'package:doboard/features/tasks/domain/entities/task.dart';
@@ -13,21 +12,15 @@ class TaskRepositoryImpl implements ITaskRepository {
   final AppDatabase _db;
   static const _uuid = Uuid();
 
-  // ─── Tareas ────────────────────────────────────────────────────────────────
+  @override
+  Stream<List<Task>> watchTasksByBoard(String boardId) => _db.tasksDao
+      .watchTasksByBoard(boardId)
+      .map((rows) => rows.map((r) => r.toTask()).toList());
 
   @override
-  Stream<List<Task>> watchTasksByBoard(String boardId) {
-    return _db.tasksDao
-        .watchTasksByBoard(boardId)
-        .map((rows) => rows.map((r) => r.toTask()).toList());
-  }
-
-  @override
-  Stream<List<Task>> watchPendingTasksByBoard(String boardId) {
-    return _db.tasksDao
-        .watchPendingTasksByBoard(boardId)
-        .map((rows) => rows.map((r) => r.toTask()).toList());
-  }
+  Stream<List<Task>> watchPendingTasksByBoard(String boardId) => _db.tasksDao
+      .watchPendingTasksByBoard(boardId)
+      .map((rows) => rows.map((r) => r.toTask()).toList());
 
   @override
   Future<Task?> getTaskById(String id) async {
@@ -43,66 +36,53 @@ class TaskRepositoryImpl implements ITaskRepository {
     String? content,
     Priority priority = Priority.low,
     String? detectedKeyword,
+    String? parentTaskTitle,
   }) {
     final now = DateTime.now().millisecondsSinceEpoch;
     return _db.tasksDao.insertTask(TasksCompanion(
-      id: Value(id),
-      boardId: Value(boardId),
-      title: Value(title),
-      content: Value(content),
-      priority: Value(priority.value),
-      position: const Value(0),
-      isDone: const Value(false),
-      isFrog: const Value(false),
-      isPinned: const Value(false),
+      id: Value(id), boardId: Value(boardId), title: Value(title),
+      content: Value(content), priority: Value(priority.value),
+      position: const Value(0), isDone: const Value(false),
+      isFrog: const Value(false), isPinned: const Value(false),
       detectedKeyword: Value(detectedKeyword),
-      createdAt: Value(now),
-      updatedAt: Value(now),
+      parentTaskTitle: Value(parentTaskTitle),
+      createdAt: Value(now), updatedAt: Value(now),
     ));
   }
 
   @override
-  Future<void> updateTask(Task task) {
-    return _db.tasksDao.updateTask(task.toCompanion());
-  }
+  Future<void> updateTask(Task task) => _db.tasksDao.updateTask(task.toCompanion());
 
   @override
-  Future<void> deleteTask(String id) {
-    return _db.tasksDao.deleteTask(id);
-  }
+  Future<void> deleteTask(String id) => _db.tasksDao.deleteTask(id);
 
   @override
-  Future<void> toggleDone(String id, {required bool isDone}) {
-    return _db.tasksDao.toggleDone(id, isDone: isDone);
-  }
+  Future<void> toggleDone(String id, {required bool isDone}) =>
+      _db.tasksDao.toggleDone(id, isDone: isDone);
 
   @override
-  Future<void> moveToBoard(String taskId, String targetBoardId) {
-    return _db.tasksDao.moveToBoard(taskId, targetBoardId);
-  }
+  Future<void> moveToBoard(String taskId, String targetBoardId) =>
+      _db.tasksDao.moveToBoard(taskId, targetBoardId);
 
   @override
-  Future<void> setFrog(String taskId, String boardId) {
-    return _db.tasksDao.setFrog(taskId, boardId);
-  }
+  Future<void> setFrog(String taskId, String boardId) =>
+      _db.tasksDao.setFrog(taskId, boardId);
 
   @override
-  Future<void> removeFrog(String taskId) {
-    return _db.tasksDao.removeFrog(taskId);
-  }
+  Future<void> removeFrog(String taskId) => _db.tasksDao.removeFrog(taskId);
 
   @override
   Future<void> reorderTasks(String boardId, List<String> orderedIds) {
-    final positions = {
-      for (var i = 0; i < orderedIds.length; i++) orderedIds[i]: i,
-    };
+    final positions = {for (var i = 0; i < orderedIds.length; i++) orderedIds[i]: i};
     return _db.tasksDao.reorderTasks(positions);
   }
 
   @override
-  Future<void> clearCompleted(String boardId) {
-    return _db.tasksDao.clearCompleted(boardId);
-  }
+  Future<void> clearCompleted(String boardId) => _db.tasksDao.clearCompleted(boardId);
+
+  @override
+  Future<int> countPendingByBoard(String boardId) =>
+      _db.tasksDao.countPendingByBoard(boardId);
 
   @override
   Future<void> duplicateTask(String taskId) async {
@@ -114,11 +94,9 @@ class TaskRepositoryImpl implements ITaskRepository {
   // ─── Subtareas ─────────────────────────────────────────────────────────────
 
   @override
-  Stream<List<Subtask>> watchSubtasksByTask(String taskId) {
-    return _db.subtasksDao
-        .watchSubtasksByTask(taskId)
-        .map((rows) => rows.map((r) => r.toSubtask()).toList());
-  }
+  Stream<List<Subtask>> watchSubtasksByTask(String taskId) => _db.subtasksDao
+      .watchSubtasksByTask(taskId)
+      .map((rows) => rows.map((r) => r.toSubtask()).toList());
 
   @override
   Future<void> createSubtask({
@@ -128,38 +106,31 @@ class TaskRepositoryImpl implements ITaskRepository {
   }) {
     final now = DateTime.now().millisecondsSinceEpoch;
     return _db.subtasksDao.insertSubtask(SubtasksCompanion(
-      id: Value(id),
-      taskId: Value(taskId),
-      title: Value(title),
-      isDone: const Value(false),
-      position: const Value(0),
-      createdAt: Value(now),
+      id: Value(id), taskId: Value(taskId), title: Value(title),
+      isDone: const Value(false), position: const Value(0),
+      isPromoted: const Value(false), createdAt: Value(now),
     ));
   }
 
   @override
-  Future<void> updateSubtask(Subtask subtask) {
-    return _db.subtasksDao.updateSubtask(subtask.toCompanion());
-  }
+  Future<void> updateSubtask(Subtask subtask) =>
+      _db.subtasksDao.updateSubtask(subtask.toCompanion());
 
   @override
-  Future<void> toggleSubtaskDone(String id, {required bool isDone}) {
-    return _db.subtasksDao.toggleDone(id, isDone: isDone);
-  }
+  Future<void> toggleSubtaskDone(String id, {required bool isDone}) =>
+      _db.subtasksDao.toggleDone(id, isDone: isDone);
 
   @override
-  Future<void> deleteSubtask(String id) {
-    return _db.subtasksDao.deleteSubtask(id);
-  }
+  Future<void> deleteSubtask(String id) => _db.subtasksDao.deleteSubtask(id);
 
   @override
   Future<void> reorderSubtasks(String taskId, List<String> orderedIds) {
-    final positions = {
-      for (var i = 0; i < orderedIds.length; i++) orderedIds[i]: i,
-    };
+    final positions = {for (var i = 0; i < orderedIds.length; i++) orderedIds[i]: i};
     return _db.subtasksDao.reorderSubtasks(positions);
   }
 
+  /// Promueve una subtarea a tarea en otra columna.
+  /// La subtarea queda como "fantasma" (isPromoted=true) en la lista del padre.
   @override
   Future<void> promoteSubtaskToTask({
     required String subtaskId,
@@ -170,11 +141,17 @@ class TaskRepositoryImpl implements ITaskRepository {
     final subtask = subtasks.where((s) => s.id == subtaskId).firstOrNull;
     if (subtask == null) return;
 
+    final parentData = await _db.tasksDao.getTaskById(parentTaskId);
+    final parentTitle = parentData?.title;
     final now = DateTime.now().millisecondsSinceEpoch;
+
     await _db.transaction(() async {
-      // Eliminar la subtarea
-      await _db.subtasksDao.deleteSubtask(subtaskId);
-      // Crear una tarea nueva con el mismo título
+      // Marcar como promovida (fantasma) en vez de eliminar
+      await ((_db.update(_db.subtasks))
+        ..where((s) => s.id.equals(subtaskId)))
+          .write(const SubtasksCompanion(isPromoted: Value(true)));
+
+      // Crear la tarea nueva con referencia al padre
       await _db.tasksDao.insertTask(TasksCompanion(
         id: Value(_uuid.v4()),
         boardId: Value(targetBoardId),
@@ -184,6 +161,7 @@ class TaskRepositoryImpl implements ITaskRepository {
         isDone: const Value(false),
         isFrog: const Value(false),
         isPinned: const Value(false),
+        parentTaskTitle: Value(parentTitle),
         createdAt: Value(now),
         updatedAt: Value(now),
       ));

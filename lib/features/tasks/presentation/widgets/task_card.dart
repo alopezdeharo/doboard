@@ -30,12 +30,10 @@ class _TaskCardState extends ConsumerState<TaskCard> {
   void _closeMenu() {
     if (_showMenu) setState(() => _showMenu = false);
   }
-  
 
   @override
   Widget build(BuildContext context) {
     final task = widget.task;
-    final theme = Theme.of(context);
     final actions = ref.read(taskActionsProvider.notifier);
 
     return GestureDetector(
@@ -46,7 +44,6 @@ class _TaskCardState extends ConsumerState<TaskCard> {
         children: [
           Slidable(
             key: ValueKey(task.id),
-            // Swipe izquierda → completar
             endActionPane: ActionPane(
               motion: const DrawerMotion(),
               extentRatio: 0.28,
@@ -57,11 +54,11 @@ class _TaskCardState extends ConsumerState<TaskCard> {
                     actions.toggleDone(task.id, isDone: !task.isDone);
                   },
                   backgroundColor: task.isDone
-                      ? theme.colorScheme.surfaceVariant
-                      : theme.colorScheme.primary,
+                      ? Theme.of(context).colorScheme.surfaceVariant
+                      : Theme.of(context).colorScheme.primary,
                   foregroundColor: task.isDone
-                      ? theme.colorScheme.onSurfaceVariant
-                      : theme.colorScheme.onPrimary,
+                      ? Theme.of(context).colorScheme.onSurfaceVariant
+                      : Theme.of(context).colorScheme.onPrimary,
                   icon: task.isDone ? Icons.undo_rounded : Icons.check_rounded,
                   borderRadius: const BorderRadius.only(
                     topRight: Radius.circular(12),
@@ -70,7 +67,6 @@ class _TaskCardState extends ConsumerState<TaskCard> {
                 ),
               ],
             ),
-            // Swipe derecha → eliminar
             startActionPane: ActionPane(
               motion: const DrawerMotion(),
               extentRatio: 0.28,
@@ -80,8 +76,8 @@ class _TaskCardState extends ConsumerState<TaskCard> {
                     HapticFeedback.mediumImpact();
                     actions.deleteTask(task.id);
                   },
-                  backgroundColor: theme.colorScheme.error,
-                  foregroundColor: theme.colorScheme.onError,
+                  backgroundColor: Theme.of(context).colorScheme.error,
+                  foregroundColor: Theme.of(context).colorScheme.onError,
                   icon: Icons.delete_outline_rounded,
                   borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(12),
@@ -94,7 +90,6 @@ class _TaskCardState extends ConsumerState<TaskCard> {
               task: task,
               boardId: widget.boardId,
               onMenuTap: _toggleMenu,
-
             ),
           ),
           AnimatedSize(
@@ -121,7 +116,6 @@ class _CardBody extends ConsumerWidget {
     required this.task,
     required this.boardId,
     required this.onMenuTap,
-
   });
 
   final Task task;
@@ -135,7 +129,6 @@ class _CardBody extends ConsumerWidget {
     final isDone = task.isDone;
     final hasPriority = task.priority != Priority.low;
 
-    // Subtareas: cargamos hasta 3 para mostrar preview
     final subtasksAsync = ref.watch(subtasksByTaskProvider(task.id));
     final subtasks = subtasksAsync.valueOrNull ?? [];
 
@@ -143,172 +136,232 @@ class _CardBody extends ConsumerWidget {
         ? Colors.transparent
         : Color(int.parse(task.priority.colorHex.replaceFirst('#', '0xFF')));
 
-    return Container(
-      decoration: BoxDecoration(
-        color: task.isFrog
-            ? theme.colorScheme.primaryContainer.withOpacity(0.35)
-            : theme.colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(12),
-        border: Border(
-          left: hasPriority
-              ? BorderSide(color: priorityColor, width: 3)
-              : BorderSide(
+    // ── Stack: fondo + barra de prioridad superpuesta ──────────────────
+    // Usar Stack en vez de Border con lados distintos evita el bug de
+    // invisibilidad que ocurre cuando Flutter no puede combinar BorderRadius
+    // con bordes de distinto grosor.
+    return Stack(
+      children: [
+        // Tarjeta principal con borde uniforme
+        Container(
+          decoration: BoxDecoration(
+            color: task.isFrog
+                ? theme.colorScheme.primaryContainer.withOpacity(0.35)
+                : theme.colorScheme.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
               color: theme.colorScheme.outlineVariant.withOpacity(0.5),
-              width: 0.5),
-          top: BorderSide(
-              color: theme.colorScheme.outlineVariant.withOpacity(0.5),
-              width: 0.5),
-          right: BorderSide(
-              color: theme.colorScheme.outlineVariant.withOpacity(0.5),
-              width: 0.5),
-          bottom: BorderSide(
-              color: theme.colorScheme.outlineVariant.withOpacity(0.5),
-              width: 0.5),
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(10, 9, 6, 9),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ── Checkbox ──────────────────────────────────────────────
-            _AnimatedCheckbox(
-              isDone: isDone,
-              priority: task.priority,
-              onTap: () {
-                HapticFeedback.selectionClick();
-                actions.toggleDone(task.id, isDone: !isDone);
-              },
+              width: 0.5,
             ),
-            const SizedBox(width: 9),
+          ),
+          child: Padding(
+            // Padding extra izquierda cuando hay prioridad para que el
+            // contenido no quede tapado por la barra de color
+            padding: EdgeInsets.fromLTRB(
+                hasPriority ? 13 : 10, 9, 6, 9),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ── Checkbox ────────────────────────────────────────
+                _AnimatedCheckbox(
+                  isDone: isDone,
+                  priority: task.priority,
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    actions.toggleDone(task.id, isDone: !isDone);
+                  },
+                ),
+                const SizedBox(width: 9),
 
-            // ── Contenido ─────────────────────────────────────────────
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Badge frog
-                  if (task.isFrog) ...[
-                    _FrogBadge(),
-                    const SizedBox(height: 3),
-                  ],
-
-                  // Título + keyword
-                  Row(children: [
-                    Expanded(
-                      child: Text(
-                        task.title,
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          color: isDone
-                              ? theme.colorScheme.onSurface.withOpacity(0.35)
-                              : theme.colorScheme.onSurface,
-                          decoration: isDone ? TextDecoration.lineThrough : null,
-                          decorationColor:
-                          theme.colorScheme.onSurface.withOpacity(0.35),
+                // ── Contenido ────────────────────────────────────────
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Referencia a tarea padre (si fue subtarea)
+                      if (task.isPromotedSubtask) ...[
+                        Text(
+                          '↳ ${task.parentTaskTitle}',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontSize: 10,
+                            color: theme.colorScheme.onSurface.withOpacity(0.4),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    if (task.detectedKeyword != null) ...[
-                      const SizedBox(width: 4),
-                      Text(task.detectedKeyword!,
-                          style: const TextStyle(fontSize: 14)),
+                        const SizedBox(height: 2),
+                      ],
+
+                      // Badge frog
+                      if (task.isFrog) ...[
+                        _FrogBadge(),
+                        const SizedBox(height: 3),
+                      ],
+
+                      // Título + keyword
+                      Row(children: [
+                        Expanded(
+                          child: Text(
+                            task.title,
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              color: isDone
+                                  ? theme.colorScheme.onSurface.withOpacity(0.35)
+                                  : theme.colorScheme.onSurface,
+                              decoration:
+                              isDone ? TextDecoration.lineThrough : null,
+                              decorationColor:
+                              theme.colorScheme.onSurface.withOpacity(0.35),
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (task.detectedKeyword != null) ...[
+                          const SizedBox(width: 4),
+                          Text(task.detectedKeyword!,
+                              style: const TextStyle(fontSize: 14)),
+                        ],
+                      ]),
+
+                      // Preview descripción
+                      if (task.content != null &&
+                          task.content!.isNotEmpty &&
+                          !isDone) ...[
+                        const SizedBox(height: 2),
+                        ShaderMask(
+                          shaderCallback: (bounds) => const LinearGradient(
+                            begin: Alignment.centerLeft,
+                            end: Alignment.centerRight,
+                            colors: [
+                              Colors.black,
+                              Colors.black,
+                              Colors.transparent
+                            ],
+                            stops: [0, 0.75, 1],
+                          ).createShader(bounds),
+                          blendMode: BlendMode.dstIn,
+                          child: Text(
+                            task.content!,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurface.withOpacity(0.5),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.clip,
+                          ),
+                        ),
+                      ],
+
+                      // Preview subtareas
+                      if (!isDone && subtasks.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        _SubtaskPreview(subtasks: subtasks),
+                      ],
+
+                      // Badge nota
+                      if (!isDone && task.hasNote) ...[
+                        const SizedBox(height: 5),
+                        _Badge(icon: Icons.notes_rounded, label: 'nota'),
+                      ],
                     ],
-                  ]),
+                  ),
+                ),
 
-                  // Preview descripción
-                  if (task.content != null &&
-                      task.content!.isNotEmpty &&
-                      !isDone) ...[
-                    const SizedBox(height: 2),
-                    ShaderMask(
-                      shaderCallback: (bounds) => const LinearGradient(
-                        begin: Alignment.centerLeft,
-                        end: Alignment.centerRight,
-                        colors: [Colors.black, Colors.black, Colors.transparent],
-                        stops: [0, 0.75, 1],
-                      ).createShader(bounds),
-                      blendMode: BlendMode.dstIn,
-                      child: Text(
-                        task.content!,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color:
-                          theme.colorScheme.onSurface.withOpacity(0.5),
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.clip,
-                      ),
+                // ── Botón subtarea rápida ↳ ──────────────────────────
+                GestureDetector(
+                  onTap: () => _showQuickSubtaskInput(context, ref, task),
+                  behavior: HitTestBehavior.opaque,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(4, 0, 0, 0),
+                    child: Icon(
+                      Icons.subdirectory_arrow_right_rounded,
+                      size: 16,
+                      color: theme.colorScheme.onSurface.withOpacity(0.3),
                     ),
-                  ],
+                  ),
+                ),
 
-                  // ── Subtareas preview (máx 3 + fade) ─────────────
-                  if (!isDone && subtasks.isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    _SubtaskPreview(subtasks: subtasks),
-                  ],
-
-                  // Badges nota
-                  if (!isDone && task.hasNote) ...[
-                    const SizedBox(height: 5),
-                    _Badge(icon: Icons.notes_rounded, label: 'nota'),
-                  ],
-                ],
-              ),
+                // ── Botón menú ⋮ ─────────────────────────────────────
+                GestureDetector(
+                  onTap: onMenuTap,
+                  behavior: HitTestBehavior.opaque,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(4, 0, 4, 0),
+                    child: Icon(
+                      Icons.more_vert_rounded,
+                      size: 18,
+                      color: theme.colorScheme.onSurface.withOpacity(0.35),
+                    ),
+                  ),
+                ),
+              ],
             ),
-
-            // Añadir subtareas en el propio card
-            GestureDetector(
-              onTap: () => _showQuickSubtaskInput(context, ref, task),
-              behavior: HitTestBehavior.opaque,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(4, 0, 0, 0),
-                child: Icon(Icons.subdirectory_arrow_right_rounded,
-                    size: 16,
-                    color: theme.colorScheme.onSurface.withOpacity(0.3)),
-              ),
-            ),
-
-            // ── Botón menú ⋮ ──────────────────────────────────────────
-            GestureDetector(
-              onTap: onMenuTap,
-              behavior: HitTestBehavior.opaque,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(6, 0, 4, 0),
-                child: Icon(Icons.more_vert_rounded,
-                    size: 18,
-                    color: theme.colorScheme.onSurface.withOpacity(0.35)),
-              ),
-            ),
-          ],
+          ),
         ),
-      ),
+
+        // Barra de prioridad superpuesta (izquierda)
+        if (hasPriority)
+          Positioned(
+            left: 0,
+            top: 0,
+            bottom: 0,
+            child: Container(
+              width: 3,
+              decoration: BoxDecoration(
+                color: priorityColor,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(12),
+                  bottomLeft: Radius.circular(12),
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 
-  void _showQuickSubtaskInput(BuildContext context, WidgetRef ref, Task task) {
+  void _showQuickSubtaskInput(
+      BuildContext context, WidgetRef ref, Task task) {
     final controller = TextEditingController();
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
       builder: (ctx) => Padding(
         padding: EdgeInsets.only(
-          bottom: MediaQuery.of(ctx).viewInsets.bottom,
-          left: 16, right: 16, top: 16,
+          bottom: MediaQuery.of(ctx).viewInsets.bottom + 8,
+          left: 16,
+          right: 8,
+          top: 16,
         ),
         child: Row(children: [
+          Icon(Icons.subdirectory_arrow_right_rounded,
+              size: 18,
+              color: Theme.of(ctx).colorScheme.onSurface.withOpacity(0.4)),
+          const SizedBox(width: 10),
           Expanded(
             child: TextField(
               controller: controller,
               autofocus: true,
               textCapitalization: TextCapitalization.sentences,
-              decoration: const InputDecoration(
-                hintText: 'Nueva subtarea...',
+              style: TextStyle(
+                  color: Theme.of(ctx).colorScheme.onSurface),
+              cursorColor: Theme.of(ctx).colorScheme.primary,
+              decoration: InputDecoration(
+                hintText: 'Nueva subtarea en "${task.title}"...',
+                hintStyle: TextStyle(
+                  color: Theme.of(ctx).colorScheme.onSurface.withOpacity(0.4),
+                  fontSize: 14,
+                ),
                 border: InputBorder.none,
+                isDense: true,
               ),
               onSubmitted: (v) {
                 if (v.trim().isNotEmpty) {
-                  ref.read(taskActionsProvider.notifier)
+                  ref
+                      .read(taskActionsProvider.notifier)
                       .createSubtask(taskId: task.id, title: v.trim());
                 }
                 Navigator.pop(ctx);
@@ -316,11 +369,12 @@ class _CardBody extends ConsumerWidget {
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.check_rounded),
+            icon: Icon(Icons.check_rounded,
+                color: Theme.of(ctx).colorScheme.primary),
             onPressed: () {
               if (controller.text.trim().isNotEmpty) {
-                ref.read(taskActionsProvider.notifier)
-                    .createSubtask(taskId: task.id, title: controller.text.trim());
+                ref.read(taskActionsProvider.notifier).createSubtask(
+                    taskId: task.id, title: controller.text.trim());
               }
               Navigator.pop(ctx);
             },
@@ -331,7 +385,7 @@ class _CardBody extends ConsumerWidget {
   }
 }
 
-// ─── Preview de subtareas con fade ───────────────────────────────────────────
+// ─── Preview subtareas con fade ───────────────────────────────────────────────
 
 class _SubtaskPreview extends StatelessWidget {
   const _SubtaskPreview({required this.subtasks});
@@ -346,10 +400,8 @@ class _SubtaskPreview extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Las subtareas visibles con fade en la última si hay más
         ShaderMask(
           shaderCallback: (bounds) {
-            // Solo aplicar fade si hay subtareas ocultas
             if (remaining == 0) {
               return const LinearGradient(
                   colors: [Colors.black, Colors.black])
@@ -369,7 +421,9 @@ class _SubtaskPreview extends StatelessWidget {
               padding: const EdgeInsets.only(bottom: 2),
               child: Row(children: [
                 Icon(
-                  s.isDone ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded,
+                  s.isDone
+                      ? Icons.check_box_rounded
+                      : Icons.check_box_outline_blank_rounded,
                   size: 12,
                   color: s.isDone
                       ? theme.colorScheme.primary
@@ -384,7 +438,8 @@ class _SubtaskPreview extends StatelessWidget {
                       color: s.isDone
                           ? theme.colorScheme.onSurface.withOpacity(0.3)
                           : theme.colorScheme.onSurface.withOpacity(0.6),
-                      decoration: s.isDone ? TextDecoration.lineThrough : null,
+                      decoration:
+                      s.isDone ? TextDecoration.lineThrough : null,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -394,7 +449,6 @@ class _SubtaskPreview extends StatelessWidget {
             )).toList(),
           ),
         ),
-        // "+N más" si hay ocultas
         if (remaining > 0)
           Padding(
             padding: const EdgeInsets.only(top: 1),
@@ -450,8 +504,8 @@ class _AnimatedCheckbox extends StatelessWidget {
           ),
         ),
         child: isDone
-            ? Icon(Icons.check_rounded, size: 13,
-            color: theme.colorScheme.onPrimary)
+            ? Icon(Icons.check_rounded,
+            size: 13, color: theme.colorScheme.onPrimary)
             : null,
       ),
     );
@@ -495,10 +549,8 @@ class _Badge extends StatelessWidget {
       Icon(icon, size: 11, color: color),
       const SizedBox(width: 2),
       Text(label,
-          style: Theme.of(context)
-              .textTheme
-              .labelSmall
-              ?.copyWith(color: color)),
+          style:
+          Theme.of(context).textTheme.labelSmall?.copyWith(color: color)),
     ]);
   }
 }

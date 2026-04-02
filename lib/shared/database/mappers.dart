@@ -34,6 +34,9 @@ extension TaskDataMapper on TaskData {
         ? DateTime.fromMillisecondsSinceEpoch(completedAt!)
         : null,
     parentTaskTitle: parentTaskTitle,
+    scheduledDate: scheduledDate != null
+        ? DateTime.fromMillisecondsSinceEpoch(scheduledDate!)
+        : null,
   );
 }
 extension TaskEntityMapper on Task {
@@ -47,6 +50,7 @@ extension TaskEntityMapper on Task {
       createdAt: Value(createdAt.millisecondsSinceEpoch), updatedAt: Value(now),
       completedAt: Value(completedAt?.millisecondsSinceEpoch),
       parentTaskTitle: Value(parentTaskTitle),
+      scheduledDate: Value(scheduledDate?.millisecondsSinceEpoch),
     );
   }
 }

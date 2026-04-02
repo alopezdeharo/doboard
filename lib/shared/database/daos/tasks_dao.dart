@@ -9,13 +9,6 @@ part 'tasks_dao.g.dart';
 class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
   TasksDao(super.db);
 
-  // ─── Lecturas ──────────────────────────────────────────────────────────────
-
-  /// Stream de tareas de un tablero, ordenadas por:
-  /// 1. Fijadas primero (isPinned DESC)
-  /// 2. Rana primero (isFrog DESC)
-  /// 3. Prioridad descendente
-  /// 4. Posición manual
   Stream<List<TaskData>> watchTasksByBoard(String boardId) {
     return (select(tasks)
       ..where((t) => t.boardId.equals(boardId))
@@ -28,7 +21,6 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
         .watch();
   }
 
-  /// Stream de tareas pendientes de un tablero (sin completadas).
   Stream<List<TaskData>> watchPendingTasksByBoard(String boardId) {
     return (select(tasks)
       ..where((t) => t.boardId.equals(boardId) & t.isDone.equals(false))
@@ -41,12 +33,10 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
         .watch();
   }
 
-  /// Obtiene una tarea por ID.
   Future<TaskData?> getTaskById(String id) {
     return (select(tasks)..where((t) => t.id.equals(id))).getSingleOrNull();
   }
 
-  /// Cuenta de tareas pendientes por tablero (para el badge del dot nav).
   Future<int> countPendingByBoard(String boardId) async {
     final count = tasks.id.count();
     final query = selectOnly(tasks)
@@ -55,8 +45,6 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
     final result = await query.getSingle();
     return result.read(count) ?? 0;
   }
-
-  // ─── Escrituras ────────────────────────────────────────────────────────────
 
   Future<void> insertTask(TasksCompanion task) {
     return into(tasks).insert(task);
@@ -70,7 +58,6 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
     return (delete(tasks)..where((t) => t.id.equals(id))).go();
   }
 
-  /// Marca o desmarca como completada. Registra completedAt si done=true.
   Future<void> toggleDone(String id, {required bool isDone}) {
     final now = DateTime.now().millisecondsSinceEpoch;
     return (update(tasks)..where((t) => t.id.equals(id))).write(
@@ -82,35 +69,30 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
     );
   }
 
-  /// Mueve una tarea a otro tablero (cambia boardId y resetea posición).
   Future<void> moveToBoard(String taskId, String targetBoardId) {
     return (update(tasks)..where((t) => t.id.equals(taskId))).write(
       TasksCompanion(
         boardId: Value(targetBoardId),
-        isFrog: const Value(false), // la rana no viaja entre tableros
+        isFrog: const Value(false),
         position: const Value(0),
+        scheduledDate: const Value(null), // limpiar fecha al mover manualmente
         updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
       ),
     );
   }
 
-  /// Asigna la rana del día: quita la rana a todas las tareas del tablero
-  /// y la asigna solo a la tarea indicada.
   Future<void> setFrog(String taskId, String boardId) async {
     final now = DateTime.now().millisecondsSinceEpoch;
     await transaction(() async {
-      // Quitar rana a todas las del tablero
       await (update(tasks)..where((t) => t.boardId.equals(boardId))).write(
         TasksCompanion(isFrog: const Value(false), updatedAt: Value(now)),
       );
-      // Asignar rana a la tarea elegida
       await (update(tasks)..where((t) => t.id.equals(taskId))).write(
         TasksCompanion(isFrog: const Value(true), updatedAt: Value(now)),
       );
     });
   }
 
-  /// Elimina la rana de una tarea (toggle off).
   Future<void> removeFrog(String taskId) {
     return (update(tasks)..where((t) => t.id.equals(taskId))).write(
       TasksCompanion(
@@ -120,30 +102,23 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
     );
   }
 
-  /// Actualiza las posiciones de varias tareas en una transacción.
-  /// Se usa después de reordenar por D&D.
   Future<void> reorderTasks(Map<String, int> positions) async {
     final now = DateTime.now().millisecondsSinceEpoch;
     await transaction(() async {
       for (final entry in positions.entries) {
         await (update(tasks)..where((t) => t.id.equals(entry.key))).write(
-          TasksCompanion(
-            position: Value(entry.value),
-            updatedAt: Value(now),
-          ),
+          TasksCompanion(position: Value(entry.value), updatedAt: Value(now)),
         );
       }
     });
   }
 
-  /// Elimina todas las tareas completadas de un tablero.
   Future<int> clearCompleted(String boardId) {
     return (delete(tasks)
       ..where((t) => t.boardId.equals(boardId) & t.isDone.equals(true)))
         .go();
   }
 
-  /// Duplica una tarea (crea una copia con nuevo ID justo debajo).
   Future<void> duplicateTask(TaskData original, String newId) {
     final now = DateTime.now().millisecondsSinceEpoch;
     return into(tasks).insert(TasksCompanion(
@@ -157,8 +132,38 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
       isFrog: const Value(false),
       isPinned: const Value(false),
       detectedKeyword: Value(original.detectedKeyword),
+      parentTaskTitle: Value(original.parentTaskTitle),
       createdAt: Value(now),
       updatedAt: Value(now),
+    ));
+  }
+
+  /// Devuelve tareas cuya fecha programada ya ha llegado y no están en "Hoy".
+  Future<List<TaskData>> getTasksDueToMove(
+      String todayBoardId, int nowMs) async {
+    return (select(tasks)
+      ..where((t) =>
+      t.scheduledDate.isNotNull() &
+      t.scheduledDate.isSmallerOrEqualValue(nowMs) &
+      t.boardId.isNotValue(todayBoardId) &
+      t.isDone.equals(false)))
+        .get();
+  }
+
+  /// Mueve las tareas programadas a "Hoy" (se llama al abrir la app).
+  Future<int> moveScheduledTasksToToday(
+      String todayBoardId, int nowMs) async {
+    return (update(tasks)
+      ..where((t) =>
+      t.scheduledDate.isNotNull() &
+      t.scheduledDate.isSmallerOrEqualValue(nowMs) &
+      t.boardId.isNotValue(todayBoardId) &
+      t.isDone.equals(false)))
+        .write(TasksCompanion(
+      boardId: Value(todayBoardId),
+      scheduledDate: const Value(null),
+      position: const Value(0),
+      updatedAt: Value(nowMs),
     ));
   }
 }

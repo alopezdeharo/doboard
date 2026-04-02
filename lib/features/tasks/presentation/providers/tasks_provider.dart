@@ -7,8 +7,6 @@ import '../../domain/entities/subtask.dart';
 import '../../domain/entities/task.dart';
 import '../../domain/repositories/i_task_repository.dart';
 
-// ─── Stream providers ─────────────────────────────────────────────────────────
-
 final tasksByBoardProvider =
 StreamProvider.family<List<Task>, String>((ref, boardId) {
   return ref.watch(taskRepositoryProvider).watchTasksByBoard(boardId);
@@ -19,12 +17,7 @@ StreamProvider.family<List<Subtask>, String>((ref, taskId) {
   return ref.watch(taskRepositoryProvider).watchSubtasksByTask(taskId);
 });
 
-// ─── Drag & drop ──────────────────────────────────────────────────────────────
-
-/// La tarea que se está arrastrando actualmente (null = ninguna).
 final dragStateProvider = StateProvider<Task?>((ref) => null);
-
-// ─── Acciones sobre tareas ────────────────────────────────────────────────────
 
 class TaskActionsNotifier extends Notifier<AsyncValue<void>> {
   @override
@@ -52,8 +45,14 @@ class TaskActionsNotifier extends Notifier<AsyncValue<void>> {
 
   Future<void> updateTask(Task task) => _repo.updateTask(task);
 
-  Future<void> toggleDone(String taskId, {required bool isDone}) =>
-      _repo.toggleDone(taskId, isDone: isDone);
+  /// Completa/descompleta una tarea.
+  /// Si la tarea fue una subtarea promovida, sincroniza el estado
+  /// en la subtarea original del padre.
+  Future<void> toggleDone(String taskId, {required bool isDone}) async {
+    await _repo.toggleDone(taskId, isDone: isDone);
+    // Sincronizar con la subtarea padre si aplica
+    await _repo.syncPromotedSubtaskDone(taskId, isDone: isDone);
+  }
 
   Future<void> deleteTask(String taskId) => _repo.deleteTask(taskId);
 
@@ -73,22 +72,36 @@ class TaskActionsNotifier extends Notifier<AsyncValue<void>> {
   Future<void> duplicateTask(String taskId) => _repo.duplicateTask(taskId);
 
   Future<void> createSubtask({required String taskId, required String title}) =>
-      _repo.createSubtask(id: const Uuid().v4(), taskId: taskId, title: title.trim());
+      _repo.createSubtask(
+          id: const Uuid().v4(), taskId: taskId, title: title.trim());
 
-  Future<void> toggleSubtaskDone(String subtaskId, {required bool isDone}) =>
+  Future<void> toggleSubtaskDone(String subtaskId,
+      {required bool isDone}) =>
       _repo.toggleSubtaskDone(subtaskId, isDone: isDone);
 
-  Future<void> deleteSubtask(String subtaskId) => _repo.deleteSubtask(subtaskId);
+  Future<void> deleteSubtask(String subtaskId) =>
+      _repo.deleteSubtask(subtaskId);
+
+  Future<void> reorderSubtasks(String taskId, List<String> orderedIds) =>
+      _repo.reorderSubtasks(taskId, orderedIds);
 
   Future<void> promoteSubtask({
     required String subtaskId,
     required String parentTaskId,
     required String targetBoardId,
-  }) => _repo.promoteSubtaskToTask(
-    subtaskId: subtaskId,
-    parentTaskId: parentTaskId,
-    targetBoardId: targetBoardId,
-  );
+  }) =>
+      _repo.promoteSubtaskToTask(
+        subtaskId: subtaskId,
+        parentTaskId: parentTaskId,
+        targetBoardId: targetBoardId,
+      );
+
+  /// Programa una tarea para moverse a "Hoy" en una fecha concreta.
+  Future<void> scheduleTask(String taskId, DateTime date) =>
+      _repo.scheduleTask(taskId, date);
+
+  /// Cancela la programación de una tarea.
+  Future<void> cancelSchedule(String taskId) => _repo.cancelSchedule(taskId);
 }
 
 final taskActionsProvider =

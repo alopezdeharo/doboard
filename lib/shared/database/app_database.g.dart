@@ -682,6 +682,17 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, TaskData> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _scheduledDateMeta = const VerificationMeta(
+    'scheduledDate',
+  );
+  @override
+  late final GeneratedColumn<int> scheduledDate = GeneratedColumn<int>(
+    'scheduled_date',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -698,6 +709,7 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, TaskData> {
     updatedAt,
     completedAt,
     parentTaskTitle,
+    scheduledDate,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -811,6 +823,15 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, TaskData> {
         ),
       );
     }
+    if (data.containsKey('scheduled_date')) {
+      context.handle(
+        _scheduledDateMeta,
+        scheduledDate.isAcceptableOrUnknown(
+          data['scheduled_date']!,
+          _scheduledDateMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -876,6 +897,10 @@ class $TasksTable extends Tasks with TableInfo<$TasksTable, TaskData> {
         DriftSqlType.string,
         data['${effectivePrefix}parent_task_title'],
       ),
+      scheduledDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}scheduled_date'],
+      ),
     );
   }
 
@@ -899,9 +924,10 @@ class TaskData extends DataClass implements Insertable<TaskData> {
   final int createdAt;
   final int updatedAt;
   final int? completedAt;
-
-  /// Título de la tarea padre original (si fue promovida desde subtarea).
   final String? parentTaskTitle;
+
+  /// Fecha programada para mover la tarea a "Hoy" (epoch ms). Null = sin programar.
+  final int? scheduledDate;
   const TaskData({
     required this.id,
     required this.boardId,
@@ -917,6 +943,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
     required this.updatedAt,
     this.completedAt,
     this.parentTaskTitle,
+    this.scheduledDate,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -942,6 +969,9 @@ class TaskData extends DataClass implements Insertable<TaskData> {
     }
     if (!nullToAbsent || parentTaskTitle != null) {
       map['parent_task_title'] = Variable<String>(parentTaskTitle);
+    }
+    if (!nullToAbsent || scheduledDate != null) {
+      map['scheduled_date'] = Variable<int>(scheduledDate);
     }
     return map;
   }
@@ -970,6 +1000,9 @@ class TaskData extends DataClass implements Insertable<TaskData> {
       parentTaskTitle: parentTaskTitle == null && nullToAbsent
           ? const Value.absent()
           : Value(parentTaskTitle),
+      scheduledDate: scheduledDate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(scheduledDate),
     );
   }
 
@@ -993,6 +1026,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
       updatedAt: serializer.fromJson<int>(json['updatedAt']),
       completedAt: serializer.fromJson<int?>(json['completedAt']),
       parentTaskTitle: serializer.fromJson<String?>(json['parentTaskTitle']),
+      scheduledDate: serializer.fromJson<int?>(json['scheduledDate']),
     );
   }
   @override
@@ -1013,6 +1047,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
       'updatedAt': serializer.toJson<int>(updatedAt),
       'completedAt': serializer.toJson<int?>(completedAt),
       'parentTaskTitle': serializer.toJson<String?>(parentTaskTitle),
+      'scheduledDate': serializer.toJson<int?>(scheduledDate),
     };
   }
 
@@ -1031,6 +1066,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
     int? updatedAt,
     Value<int?> completedAt = const Value.absent(),
     Value<String?> parentTaskTitle = const Value.absent(),
+    Value<int?> scheduledDate = const Value.absent(),
   }) => TaskData(
     id: id ?? this.id,
     boardId: boardId ?? this.boardId,
@@ -1050,6 +1086,9 @@ class TaskData extends DataClass implements Insertable<TaskData> {
     parentTaskTitle: parentTaskTitle.present
         ? parentTaskTitle.value
         : this.parentTaskTitle,
+    scheduledDate: scheduledDate.present
+        ? scheduledDate.value
+        : this.scheduledDate,
   );
   TaskData copyWithCompanion(TasksCompanion data) {
     return TaskData(
@@ -1073,6 +1112,9 @@ class TaskData extends DataClass implements Insertable<TaskData> {
       parentTaskTitle: data.parentTaskTitle.present
           ? data.parentTaskTitle.value
           : this.parentTaskTitle,
+      scheduledDate: data.scheduledDate.present
+          ? data.scheduledDate.value
+          : this.scheduledDate,
     );
   }
 
@@ -1092,7 +1134,8 @@ class TaskData extends DataClass implements Insertable<TaskData> {
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('completedAt: $completedAt, ')
-          ..write('parentTaskTitle: $parentTaskTitle')
+          ..write('parentTaskTitle: $parentTaskTitle, ')
+          ..write('scheduledDate: $scheduledDate')
           ..write(')'))
         .toString();
   }
@@ -1113,6 +1156,7 @@ class TaskData extends DataClass implements Insertable<TaskData> {
     updatedAt,
     completedAt,
     parentTaskTitle,
+    scheduledDate,
   );
   @override
   bool operator ==(Object other) =>
@@ -1131,7 +1175,8 @@ class TaskData extends DataClass implements Insertable<TaskData> {
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt &&
           other.completedAt == this.completedAt &&
-          other.parentTaskTitle == this.parentTaskTitle);
+          other.parentTaskTitle == this.parentTaskTitle &&
+          other.scheduledDate == this.scheduledDate);
 }
 
 class TasksCompanion extends UpdateCompanion<TaskData> {
@@ -1149,6 +1194,7 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
   final Value<int> updatedAt;
   final Value<int?> completedAt;
   final Value<String?> parentTaskTitle;
+  final Value<int?> scheduledDate;
   final Value<int> rowid;
   const TasksCompanion({
     this.id = const Value.absent(),
@@ -1165,6 +1211,7 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
     this.updatedAt = const Value.absent(),
     this.completedAt = const Value.absent(),
     this.parentTaskTitle = const Value.absent(),
+    this.scheduledDate = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   TasksCompanion.insert({
@@ -1182,6 +1229,7 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
     required int updatedAt,
     this.completedAt = const Value.absent(),
     this.parentTaskTitle = const Value.absent(),
+    this.scheduledDate = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        boardId = Value(boardId),
@@ -1203,6 +1251,7 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
     Expression<int>? updatedAt,
     Expression<int>? completedAt,
     Expression<String>? parentTaskTitle,
+    Expression<int>? scheduledDate,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1220,6 +1269,7 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
       if (updatedAt != null) 'updated_at': updatedAt,
       if (completedAt != null) 'completed_at': completedAt,
       if (parentTaskTitle != null) 'parent_task_title': parentTaskTitle,
+      if (scheduledDate != null) 'scheduled_date': scheduledDate,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1239,6 +1289,7 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
     Value<int>? updatedAt,
     Value<int?>? completedAt,
     Value<String?>? parentTaskTitle,
+    Value<int?>? scheduledDate,
     Value<int>? rowid,
   }) {
     return TasksCompanion(
@@ -1256,6 +1307,7 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
       updatedAt: updatedAt ?? this.updatedAt,
       completedAt: completedAt ?? this.completedAt,
       parentTaskTitle: parentTaskTitle ?? this.parentTaskTitle,
+      scheduledDate: scheduledDate ?? this.scheduledDate,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1305,6 +1357,9 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
     if (parentTaskTitle.present) {
       map['parent_task_title'] = Variable<String>(parentTaskTitle.value);
     }
+    if (scheduledDate.present) {
+      map['scheduled_date'] = Variable<int>(scheduledDate.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1328,6 +1383,7 @@ class TasksCompanion extends UpdateCompanion<TaskData> {
           ..write('updatedAt: $updatedAt, ')
           ..write('completedAt: $completedAt, ')
           ..write('parentTaskTitle: $parentTaskTitle, ')
+          ..write('scheduledDate: $scheduledDate, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -2625,6 +2681,7 @@ typedef $$TasksTableCreateCompanionBuilder =
       required int updatedAt,
       Value<int?> completedAt,
       Value<String?> parentTaskTitle,
+      Value<int?> scheduledDate,
       Value<int> rowid,
     });
 typedef $$TasksTableUpdateCompanionBuilder =
@@ -2643,6 +2700,7 @@ typedef $$TasksTableUpdateCompanionBuilder =
       Value<int> updatedAt,
       Value<int?> completedAt,
       Value<String?> parentTaskTitle,
+      Value<int?> scheduledDate,
       Value<int> rowid,
     });
 
@@ -2776,6 +2834,11 @@ class $$TasksTableFilterComposer extends Composer<_$AppDatabase, $TasksTable> {
 
   ColumnFilters<String> get parentTaskTitle => $composableBuilder(
     column: $table.parentTaskTitle,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get scheduledDate => $composableBuilder(
+    column: $table.scheduledDate,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -2927,6 +2990,11 @@ class $$TasksTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get scheduledDate => $composableBuilder(
+    column: $table.scheduledDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$BoardsTableOrderingComposer get boardId {
     final $$BoardsTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -3002,6 +3070,11 @@ class $$TasksTableAnnotationComposer
 
   GeneratedColumn<String> get parentTaskTitle => $composableBuilder(
     column: $table.parentTaskTitle,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get scheduledDate => $composableBuilder(
+    column: $table.scheduledDate,
     builder: (column) => column,
   );
 
@@ -3125,6 +3198,7 @@ class $$TasksTableTableManager
                 Value<int> updatedAt = const Value.absent(),
                 Value<int?> completedAt = const Value.absent(),
                 Value<String?> parentTaskTitle = const Value.absent(),
+                Value<int?> scheduledDate = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => TasksCompanion(
                 id: id,
@@ -3141,6 +3215,7 @@ class $$TasksTableTableManager
                 updatedAt: updatedAt,
                 completedAt: completedAt,
                 parentTaskTitle: parentTaskTitle,
+                scheduledDate: scheduledDate,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -3159,6 +3234,7 @@ class $$TasksTableTableManager
                 required int updatedAt,
                 Value<int?> completedAt = const Value.absent(),
                 Value<String?> parentTaskTitle = const Value.absent(),
+                Value<int?> scheduledDate = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => TasksCompanion.insert(
                 id: id,
@@ -3175,6 +3251,7 @@ class $$TasksTableTableManager
                 updatedAt: updatedAt,
                 completedAt: completedAt,
                 parentTaskTitle: parentTaskTitle,
+                scheduledDate: scheduledDate,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

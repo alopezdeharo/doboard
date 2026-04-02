@@ -79,122 +79,137 @@ class _TaskDetailView extends HookConsumerWidget {
       ref.invalidate(taskByIdProvider(task.id));
     }
 
-    return Scaffold(
-      backgroundColor: theme.colorScheme.surface,
-      body: SafeArea(
-        child: Column(
-          children: [
-            _DetailAppBar(task: task),
-            Expanded(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
-                child: FadeInUp(
-                  duration: const Duration(milliseconds: 250),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (task.isFrog) ...[
-                        _FrogBanner(),
-                        const SizedBox(height: 12),
-                      ],
+    return PopScope(
+      // Interceptar el gesto de volver para guardar la descripción pendiente
+      onPopInvokedWithResult: (didPop, _) {
+        if (isEditingContent.value) {
+          final v = contentCtrl.text.trim();
+          actions.updateTask(task.copyWith(content: v.isEmpty ? null : v));
+        }
+        if (isEditingTitle.value) {
+          final v = titleCtrl.text.trim();
+          if (v.isNotEmpty && v != task.title) {
+            actions.updateTask(task.copyWith(title: v));
+          }
+        }
+      },
+      child: Scaffold(
+        backgroundColor: theme.colorScheme.surface,
+        body: SafeArea(
+          child: Column(
+            children: [
+              _DetailAppBar(task: task),
+              Expanded(
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+                  child: FadeInUp(
+                    duration: const Duration(milliseconds: 250),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (task.isFrog) ...[
+                          _FrogBanner(),
+                          const SizedBox(height: 12),
+                        ],
 
-                      // ── Título editable ────────────────────────────
-                      GestureDetector(
-                        onTap: () => isEditingTitle.value = true,
-                        child: isEditingTitle.value
-                            ? TextField(
-                          controller: titleCtrl,
-                          autofocus: true,
-                          onSubmitted: (_) => saveTitle(),
-                          onTapOutside: (_) => saveTitle(),
-                          style: theme.textTheme.titleMedium?.copyWith(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w600),
-                          decoration: const InputDecoration(
-                              border: InputBorder.none,
-                              isDense: true,
-                              contentPadding: EdgeInsets.zero),
-                        )
-                            : Text(task.title,
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w600,
-                              decoration: task.isDone
-                                  ? TextDecoration.lineThrough
-                                  : null,
-                            )),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // ── Selector de prioridad ──────────────────────
-                      _PrioritySelector(
-                        selected: selectedPriority.value,
-                        onSelect: setPriority,
-                      ),
-                      const SizedBox(height: 20),
-
-                      // ── Descripción editable ───────────────────────
-                      GestureDetector(
-                        onTap: () => isEditingContent.value = true,
-                        child: Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.surfaceVariant
-                                .withOpacity(0.4),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: isEditingContent.value
+                        // ── Título editable ────────────────────────────
+                        GestureDetector(
+                          onTap: () => isEditingTitle.value = true,
+                          child: isEditingTitle.value
                               ? TextField(
-                            controller: contentCtrl,
+                            controller: titleCtrl,
                             autofocus: true,
-                            maxLines: null,
-                            onTapOutside: (_) => saveContent(),
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                                color: theme.colorScheme.onSurface),
-                            decoration: InputDecoration(
-                              hintText: 'Añade una descripción...',
-                              border: InputBorder.none,
-                              isDense: true,
-                              contentPadding: EdgeInsets.zero,
-                              hintStyle: theme.textTheme.bodyMedium
-                                  ?.copyWith(
-                                  color: theme.colorScheme.onSurface
-                                      .withOpacity(0.35)),
-                            ),
+                            onSubmitted: (_) => saveTitle(),
+                            onTapOutside: (_) => saveTitle(),
+                            style: theme.textTheme.titleMedium?.copyWith(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w600),
+                            decoration: const InputDecoration(
+                                border: InputBorder.none,
+                                isDense: true,
+                                contentPadding: EdgeInsets.zero),
                           )
-                              : Text(
-                            contentCtrl.text.isNotEmpty
-                                ? contentCtrl.text
-                                : 'Toca para añadir descripción...',
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: contentCtrl.text.isNotEmpty
-                                  ? theme.colorScheme.onSurface
-                                  : theme.colorScheme.onSurface
-                                  .withOpacity(0.35),
+                              : Text(task.title,
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w600,
+                                decoration: task.isDone
+                                    ? TextDecoration.lineThrough
+                                    : null,
+                              )),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // ── Selector de prioridad ──────────────────────
+                        _PrioritySelector(
+                          selected: selectedPriority.value,
+                          onSelect: setPriority,
+                        ),
+                        const SizedBox(height: 20),
+
+                        // ── Descripción editable ───────────────────────
+                        GestureDetector(
+                          onTap: () => isEditingContent.value = true,
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.surfaceVariant
+                                  .withOpacity(0.4),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: isEditingContent.value
+                                ? TextField(
+                              controller: contentCtrl,
+                              autofocus: true,
+                              maxLines: null,
+                              onTapOutside: (_) => saveContent(),
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: theme.colorScheme.onSurface),
+                              decoration: InputDecoration(
+                                hintText: 'Añade una descripción...',
+                                border: InputBorder.none,
+                                isDense: true,
+                                contentPadding: EdgeInsets.zero,
+                                hintStyle: theme.textTheme.bodyMedium
+                                    ?.copyWith(
+                                    color: theme.colorScheme.onSurface
+                                        .withOpacity(0.35)),
+                              ),
+                            )
+                                : Text(
+                              contentCtrl.text.isNotEmpty
+                                  ? contentCtrl.text
+                                  : 'Toca para añadir descripción...',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: contentCtrl.text.isNotEmpty
+                                    ? theme.colorScheme.onSurface
+                                    : theme.colorScheme.onSurface
+                                    .withOpacity(0.35),
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 24),
+                        const SizedBox(height: 24),
 
-                      // ── Nota ──────────────────────────────────────
-                      _NoteShortcut(
-                          taskId: task.id, hasNote: task.hasNote),
-                      const SizedBox(height: 24),
+                        // ── Nota ──────────────────────────────────────
+                        _NoteShortcut(
+                            taskId: task.id, hasNote: task.hasNote),
+                        const SizedBox(height: 24),
 
-                      // ── Subtareas ──────────────────────────────────
-                      _SubtaskSection(task: task),
-                    ],
+                        // ── Subtareas ──────────────────────────────────
+                        _SubtaskSection(task: task),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
-      ),
-    );
+      ), // Scaffold
+    ); // PopScope
   }
 }
 

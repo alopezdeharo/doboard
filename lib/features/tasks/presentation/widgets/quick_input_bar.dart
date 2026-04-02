@@ -5,6 +5,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import '../providers/tasks_provider.dart';
 import '../../../../core/utils/automation_engine.dart';
+import '../../../../features/settings/domain/entities/app_settings.dart';
 
 class QuickInputBar extends HookConsumerWidget {
   const QuickInputBar({super.key, required this.boardId});
@@ -18,9 +19,18 @@ class QuickInputBar extends HookConsumerWidget {
     final detectedKeyword = useState<String?>(null);
     final theme = Theme.of(context);
 
+    // Lee el ajuste de automatizaciones
+    final automationsEnabled = ref.watch(settingsProvider).maybeWhen(
+      data: (s) => s.automationsEnabled,
+      orElse: () => true,
+    );
+
     void onTextChanged(String value) {
       hasText.value = value.trim().isNotEmpty;
-      detectedKeyword.value = AutomationEngine.instance.detect(value);
+      // Solo detecta keywords si las automatizaciones están activas
+      detectedKeyword.value = automationsEnabled
+          ? AutomationEngine.instance.detect(value)
+          : null;
     }
 
     Future<void> createTask() async {
@@ -38,10 +48,8 @@ class QuickInputBar extends HookConsumerWidget {
 
     void onPlusTap() {
       if (hasText.value) {
-        // Si hay texto → crear tarea
         createTask();
       } else {
-        // Si no hay texto → enfocar el input
         focusNode.requestFocus();
       }
     }
@@ -59,7 +67,6 @@ class QuickInputBar extends HookConsumerWidget {
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
       child: Row(
         children: [
-          // Botón + (foco si vacío, crea si tiene texto)
           GestureDetector(
             onTap: onPlusTap,
             child: AnimatedContainer(
@@ -92,8 +99,6 @@ class QuickInputBar extends HookConsumerWidget {
             ),
           ),
           const SizedBox(width: 10),
-
-          // Campo de texto
           Expanded(
             child: TextField(
               controller: controller,
@@ -114,8 +119,6 @@ class QuickInputBar extends HookConsumerWidget {
               ),
             ),
           ),
-
-          // Indicador de keyword detectada (cuando está escribiendo)
           if (detectedKeyword.value != null && hasText.value)
             Padding(
               padding: const EdgeInsets.only(left: 6),

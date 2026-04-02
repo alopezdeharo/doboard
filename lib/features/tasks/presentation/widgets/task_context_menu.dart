@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
-import '../../../../core/router/app_router.dart';
 import '../../domain/entities/task.dart';
 import '../providers/tasks_provider.dart';
 import '../../../../features/boards/presentation/providers/boards_provider.dart';
@@ -25,7 +25,6 @@ class TaskContextMenu extends ConsumerWidget {
     final actions = ref.read(taskActionsProvider.notifier);
     final boardsAsync = ref.watch(visibleBoardsProvider);
 
-    // Lista de tableros destino (todos excepto el actual)
     final otherBoards = boardsAsync.maybeWhen(
       data: (boards) => boards.where((b) => b.id != boardId).toList(),
       orElse: () => [],
@@ -51,7 +50,7 @@ class TaskContextMenu extends ConsumerWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // ── Acciones principales ───────────────────────────────────
+          // ── Completar ────────────────────────────────────────────
           _MenuItem(
             icon: task.isDone
                 ? Icons.undo_rounded
@@ -64,6 +63,8 @@ class TaskContextMenu extends ConsumerWidget {
             },
           ),
           _Divider(),
+
+          // ── Ver / editar ─────────────────────────────────────────
           _MenuItem(
             icon: Icons.edit_note_rounded,
             label: 'Ver / editar',
@@ -90,7 +91,29 @@ class TaskContextMenu extends ConsumerWidget {
           ),
           _Divider(),
 
-          // ── Mover a otro tablero ───────────────────────────────────
+          // ── Programar ────────────────────────────────────────────
+          _MenuItem(
+            icon: task.isScheduled
+                ? Icons.event_busy_rounded
+                : Icons.event_rounded,
+            label: task.isScheduled
+                ? 'Programada: ${_formatDate(task.scheduledDate!)} · Cancelar'
+                : 'Programar para Hoy...',
+            color: task.isScheduled
+                ? theme.colorScheme.tertiary
+                : null,
+            onTap: () async {
+              onClose();
+              if (task.isScheduled) {
+                actions.cancelSchedule(task.id);
+              } else {
+                await _showDatePicker(context, ref, task);
+              }
+            },
+          ),
+          _Divider(),
+
+          // ── Mover a otro tablero ─────────────────────────────────
           if (otherBoards.isNotEmpty) ...[
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
@@ -117,7 +140,7 @@ class TaskContextMenu extends ConsumerWidget {
             _Divider(),
           ],
 
-          // ── Frog ──────────────────────────────────────────────────
+          // ── Frog ─────────────────────────────────────────────────
           _MenuItem(
             icon: null,
             emoji: '🐸',
@@ -139,7 +162,7 @@ class TaskContextMenu extends ConsumerWidget {
           ),
           _Divider(),
 
-          // ── Eliminar ──────────────────────────────────────────────
+          // ── Eliminar ─────────────────────────────────────────────
           _MenuItem(
             icon: Icons.delete_outline_rounded,
             label: 'Eliminar',
@@ -152,6 +175,34 @@ class TaskContextMenu extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final tomorrow = DateTime(now.year, now.month, now.day + 1);
+    final d = DateTime(date.year, date.month, date.day);
+    if (d == DateTime(now.year, now.month, now.day)) return 'hoy';
+    if (d == tomorrow) return 'mañana';
+    return DateFormat('d MMM', 'es').format(date);
+  }
+
+  Future<void> _showDatePicker(
+      BuildContext context, WidgetRef ref, Task task) async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: now.add(const Duration(days: 1)),
+      firstDate: now,
+      lastDate: now.add(const Duration(days: 365)),
+      helpText: 'Mover a Hoy en esta fecha',
+      confirmText: 'Programar',
+      cancelText: 'Cancelar',
+    );
+    if (picked != null) {
+      // Programar para las 00:00 del día seleccionado
+      final scheduled = DateTime(picked.year, picked.month, picked.day);
+      ref.read(taskActionsProvider.notifier).scheduleTask(task.id, scheduled);
+    }
   }
 }
 
@@ -180,23 +231,20 @@ class _MenuItem extends StatelessWidget {
       borderRadius: BorderRadius.circular(8),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 20,
-              child: emoji != null
-                  ? Text(emoji!, style: const TextStyle(fontSize: 14))
-                  : Icon(icon, size: 16, color: effectiveColor),
-            ),
-            const SizedBox(width: 10),
-            Text(
-              label,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: effectiveColor,
-              ),
-            ),
-          ],
-        ),
+        child: Row(children: [
+          SizedBox(
+            width: 20,
+            child: emoji != null
+                ? Text(emoji!, style: const TextStyle(fontSize: 14))
+                : Icon(icon, size: 16, color: effectiveColor),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(label,
+                style: theme.textTheme.bodyMedium
+                    ?.copyWith(color: effectiveColor)),
+          ),
+        ]),
       ),
     );
   }

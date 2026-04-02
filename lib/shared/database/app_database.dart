@@ -25,7 +25,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting() : super(NativeDatabase.memory());
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration {
@@ -40,6 +40,9 @@ class AppDatabase extends _$AppDatabase {
         }
         if (from < 3) {
           await m.addColumn(subtasks, subtasks.isPromoted);
+        }
+        if (from < 4) {
+          await m.addColumn(tasks, tasks.scheduledDate);
         }
       },
       beforeOpen: (details) async {

@@ -3,29 +3,59 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app.dart';
+import 'core/providers/repository_providers.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Orientación fija: solo portrait (una mano, sin rotación)
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-  ]);
+  await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
-  // UI inmersiva: barra de estado transparente
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.dark,
-      statusBarBrightness: Brightness.light,
-    ),
-  );
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    statusBarIconBrightness: Brightness.dark,
+    statusBarBrightness: Brightness.light,
+  ));
 
   runApp(
-    // ProviderScope es el contenedor global de Riverpod
-    // Para tests: ProviderScope(overrides: [...], child: DoboardApp())
-    const ProviderScope(
-      child: DoboardApp(),
+    ProviderScope(
+      child: _AppInitializer(child: const DoboardApp()),
     ),
   );
+}
+
+/// Procesa tareas programadas al arrancar la app.
+class _AppInitializer extends ConsumerStatefulWidget {
+  const _AppInitializer({required this.child});
+  final Widget child;
+
+  @override
+  ConsumerState<_AppInitializer> createState() => _AppInitializerState();
+}
+
+class _AppInitializerState extends ConsumerState<_AppInitializer> {
+  @override
+  void initState() {
+    super.initState();
+    // Lanzar en post-frame para que los providers estén listos
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _processScheduledTasks();
+    });
+  }
+
+  Future<void> _processScheduledTasks() async {
+    try {
+      // El tablero "Hoy" siempre es el primero visible (board-hoy)
+      final moved = await ref
+          .read(taskRepositoryProvider)
+          .processScheduledTasks('board-hoy');
+      if (moved > 0) {
+        debugPrint('doboard: $moved tarea(s) movida(s) a Hoy por programación');
+      }
+    } catch (e) {
+      debugPrint('doboard: error procesando tareas programadas: $e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }

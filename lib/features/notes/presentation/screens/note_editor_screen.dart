@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../domain/entities/note.dart';
 import '../providers/note_provider.dart';
+import '../../../../core/providers/repository_providers.dart';
 
 class NoteEditorScreen extends HookConsumerWidget {
   const NoteEditorScreen({super.key, required this.taskId});
@@ -16,19 +17,37 @@ class NoteEditorScreen extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final noteAsync = ref.watch(noteByTaskProvider(taskId));
 
+    // Cargamos el título de la tarea para mostrarlo arriba
+    final taskTitle = useState<String>('');
+    useEffect(() {
+      ref.read(taskRepositoryProvider).getTaskById(taskId).then((t) {
+        if (t != null) taskTitle.value = t.title;
+      });
+      return null;
+    }, [taskId]);
+
     return noteAsync.when(
       loading: () =>
       const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (e, _) => Scaffold(body: Center(child: Text('Error: $e'))),
-      data: (note) => _NoteEditor(taskId: taskId, note: note),
+      data: (note) => _NoteEditor(
+        taskId: taskId,
+        note: note,
+        taskTitle: taskTitle.value,
+      ),
     );
   }
 }
 
 class _NoteEditor extends HookConsumerWidget {
-  const _NoteEditor({required this.taskId, this.note});
+  const _NoteEditor({
+    required this.taskId,
+    this.note,
+    required this.taskTitle,
+  });
   final String taskId;
   final Note? note;
+  final String taskTitle;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -60,10 +79,11 @@ class _NoteEditor extends HookConsumerWidget {
       return () => quillController.removeListener(listener);
     }, [quillController]);
 
-    // Detectar patrones de lista al escribir (- o 1.)
+    // Detecta "- " al inicio de línea → bullet list
+    // Las listas numeradas (1. 2. 3.) las maneja Quill internamente
     useEffect(() {
       quillController.document.changes.listen((_) {
-        _detectListPatterns(quillController);
+        _detectBulletPattern(quillController);
       });
       return null;
     }, [quillController]);
@@ -82,22 +102,43 @@ class _NoteEditor extends HookConsumerWidget {
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
+      // Resizes para que el toolbar no quede tapado por el teclado
+      resizeToAvoidBottomInset: true,
       body: SafeArea(
         child: Column(
           children: [
-            // ── Cabecera ───────────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.fromLTRB(4, 4, 12, 0),
+            // ── Cabecera: título de la tarea + acciones ────────────────
+            Container(
+              padding: const EdgeInsets.fromLTRB(4, 8, 12, 8),
+              decoration: BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(
+                    color: theme.colorScheme.outlineVariant.withOpacity(0.3),
+                    width: 0.5,
+                  ),
+                ),
+              ),
               child: Row(children: [
                 IconButton(
-                  icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 28),
+                  icon: const Icon(Icons.keyboard_arrow_down_rounded,
+                      size: 28),
                   color: theme.colorScheme.onSurface.withOpacity(0.5),
                   onPressed: () async {
                     if (hasUnsaved.value) await save();
                     if (context.mounted) context.pop();
                   },
                 ),
-                const Spacer(),
+                Expanded(
+                  child: Text(
+                    taskTitle.isNotEmpty ? taskTitle : 'Nota',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: theme.colorScheme.onSurface,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
                 if (hasUnsaved.value)
                   TextButton(
                     onPressed: save,
@@ -121,70 +162,91 @@ class _NoteEditor extends HookConsumerWidget {
               ]),
             ),
 
-            // ── Toolbar mínima y esencial ──────────────────────────────
-            Container(
-              height: 44,
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              decoration: BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(
-                    color: theme.colorScheme.outlineVariant.withOpacity(0.4),
-                    width: 0.5,
-                  ),
-                ),
-              ),
-              child: Row(
-                children: [
-                  _ToolbarBtn(
-                    icon: Icons.format_bold_rounded,
-                    tooltip: 'Negrita',
-                    onTap: () => quillController.formatSelection(Attribute.bold),
-                  ),
-                  _ToolbarBtn(
-                    icon: Icons.format_italic_rounded,
-                    tooltip: 'Cursiva',
-                    onTap: () => quillController.formatSelection(Attribute.italic),
-                  ),
-                  _ToolbarBtn(
-                    icon: Icons.format_underline_rounded,
-                    tooltip: 'Subrayado',
-                    onTap: () => quillController.formatSelection(Attribute.underline),
-                  ),
-                  _ToolbarBtn(
-                    icon: Icons.format_strikethrough_rounded,
-                    tooltip: 'Tachado',
-                    onTap: () => quillController.formatSelection(Attribute.strikeThrough),
-                  ),
-                  const _ToolbarDivider(),
-                  _ToolbarBtn(
-                    icon: Icons.check_box_outlined,
-                    tooltip: 'Checkbox',
-                    onTap: () => quillController.formatSelection(Attribute.unchecked),
-                  ),
-                  const _ToolbarDivider(),
-                  _ColorBtn(controller: quillController, isBackground: false),
-                  _ColorBtn(controller: quillController, isBackground: true),
-                  const _ToolbarDivider(),
-                  _ToolbarBtn(
-                    icon: Icons.undo_rounded,
-                    tooltip: 'Deshacer',
-                    onTap: () => quillController.undo(),
-                  ),
-                  _ToolbarBtn(
-                    icon: Icons.redo_rounded,
-                    tooltip: 'Rehacer',
-                    onTap: () => quillController.redo(),
-                  ),
-                ],
-              ),
-            ),
-
-            // ── Editor ─────────────────────────────────────────────────
+            // ── Editor con márgenes generosos ─────────────────────────
             Expanded(
               child: QuillEditor(
                 controller: quillController,
                 focusNode: focusNode,
                 scrollController: scrollController,
+                config: QuillEditorConfig(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+                  placeholder: 'Escribe tu nota aquí...',
+                  autoFocus: note == null,
+                ),
+              ),
+            ),
+
+            // ── Toolbar en la parte inferior (como Google Keep) ────────
+            Container(
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                border: Border(
+                  top: BorderSide(
+                    color: theme.colorScheme.outlineVariant.withOpacity(0.4),
+                    width: 0.5,
+                  ),
+                ),
+              ),
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 4),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _ToolbarBtn(
+                        icon: Icons.format_bold_rounded,
+                        tooltip: 'Negrita',
+                        onTap: () => quillController
+                            .formatSelection(Attribute.bold),
+                      ),
+                      _ToolbarBtn(
+                        icon: Icons.format_italic_rounded,
+                        tooltip: 'Cursiva',
+                        onTap: () => quillController
+                            .formatSelection(Attribute.italic),
+                      ),
+                      _ToolbarBtn(
+                        icon: Icons.format_underline_rounded,
+                        tooltip: 'Subrayado',
+                        onTap: () => quillController
+                            .formatSelection(Attribute.underline),
+                      ),
+                      _ToolbarBtn(
+                        icon: Icons.format_strikethrough_rounded,
+                        tooltip: 'Tachado',
+                        onTap: () => quillController
+                            .formatSelection(Attribute.strikeThrough),
+                      ),
+                      _ToolbarDivider(),
+                      _ToolbarBtn(
+                        icon: Icons.check_box_outlined,
+                        tooltip: 'Checkbox',
+                        onTap: () => quillController
+                            .formatSelection(Attribute.unchecked),
+                      ),
+                      _ToolbarDivider(),
+                      _ColorBtn(
+                          controller: quillController,
+                          isBackground: false),
+                      _ColorBtn(
+                          controller: quillController,
+                          isBackground: true),
+                      _ToolbarDivider(),
+                      _ToolbarBtn(
+                        icon: Icons.undo_rounded,
+                        tooltip: 'Deshacer',
+                        onTap: () => quillController.undo(),
+                      ),
+                      _ToolbarBtn(
+                        icon: Icons.redo_rounded,
+                        tooltip: 'Rehacer',
+                        onTap: () => quillController.redo(),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
           ],
@@ -193,9 +255,9 @@ class _NoteEditor extends HookConsumerWidget {
     );
   }
 
-  /// Detecta "- " al inicio de línea y convierte a lista de puntos.
-  /// Las listas numeradas (1. 2. 3.) las detecta Quill internamente.
-  void _detectListPatterns(QuillController ctrl) {
+  /// Detecta "- " al inicio de línea y convierte a bullet list.
+  /// Las listas numeradas (1. 2. 3.) las gestiona Quill internamente.
+  void _detectBulletPattern(QuillController ctrl) {
     try {
       final sel = ctrl.selection;
       if (!sel.isCollapsed) return;
@@ -214,7 +276,7 @@ class _NoteEditor extends HookConsumerWidget {
   }
 }
 
-// ─── Botón de toolbar ─────────────────────────────────────────────────────────
+// ─── Botones del toolbar ──────────────────────────────────────────────────────
 
 class _ToolbarBtn extends StatelessWidget {
   const _ToolbarBtn({
@@ -232,11 +294,11 @@ class _ToolbarBtn extends StatelessWidget {
       message: tooltip,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(8),
         child: Padding(
-          padding: const EdgeInsets.all(6),
+          padding: const EdgeInsets.all(8),
           child: Icon(icon,
-              size: 20,
+              size: 22,
               color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7)),
         ),
       ),
@@ -245,22 +307,18 @@ class _ToolbarBtn extends StatelessWidget {
 }
 
 class _ToolbarDivider extends StatelessWidget {
-  const _ToolbarDivider();
   @override
   Widget build(BuildContext context) {
     return Container(
       width: 0.5,
-      height: 20,
-      margin: const EdgeInsets.symmetric(horizontal: 4),
+      height: 22,
       color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.5),
     );
   }
 }
 
-/// Botón para color de texto o fondo — abre un selector simple.
 class _ColorBtn extends StatelessWidget {
-  const _ColorBtn(
-      {required this.controller, required this.isBackground});
+  const _ColorBtn({required this.controller, required this.isBackground});
   final QuillController controller;
   final bool isBackground;
 
@@ -275,14 +333,14 @@ class _ColorBtn extends StatelessWidget {
       message: isBackground ? 'Color de fondo' : 'Color de letra',
       child: InkWell(
         onTap: () => _showColorPicker(context),
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(8),
         child: Padding(
-          padding: const EdgeInsets.all(6),
+          padding: const EdgeInsets.all(8),
           child: Icon(
             isBackground
                 ? Icons.format_color_fill_rounded
                 : Icons.format_color_text_rounded,
-            size: 20,
+            size: 22,
             color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
           ),
         ),
@@ -305,21 +363,19 @@ class _ColorBtn extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                // Sin color
                 GestureDetector(
                   onTap: () {
                     if (isBackground) {
                       controller.formatSelection(
                           const BackgroundAttribute(null));
                     } else {
-                      controller
-                          .formatSelection(const ColorAttribute(null));
+                      controller.formatSelection(const ColorAttribute(null));
                     }
                     Navigator.pop(context);
                   },
                   child: Container(
-                    width: 32,
-                    height: 32,
+                    width: 36,
+                    height: 36,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(
@@ -327,8 +383,10 @@ class _ColorBtn extends StatelessWidget {
                           width: 1.5),
                     ),
                     child: Icon(Icons.block_rounded,
-                        size: 16,
-                        color: Theme.of(context).colorScheme.onSurface
+                        size: 18,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
                             .withOpacity(0.5)),
                   ),
                 ),
@@ -337,17 +395,16 @@ class _ColorBtn extends StatelessWidget {
                     final hex =
                         '#${c.value.toRadixString(16).padLeft(8, '0').substring(2)}';
                     if (isBackground) {
-                      controller.formatSelection(
-                          BackgroundAttribute(hex));
-                    } else {
                       controller
-                          .formatSelection(ColorAttribute(hex));
+                          .formatSelection(BackgroundAttribute(hex));
+                    } else {
+                      controller.formatSelection(ColorAttribute(hex));
                     }
                     Navigator.pop(context);
                   },
                   child: Container(
-                    width: 32,
-                    height: 32,
+                    width: 36,
+                    height: 36,
                     decoration:
                     BoxDecoration(color: c, shape: BoxShape.circle),
                   ),

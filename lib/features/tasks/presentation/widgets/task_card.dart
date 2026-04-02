@@ -8,6 +8,7 @@ import '../../domain/entities/task.dart';
 import '../../domain/entities/priority.dart';
 import '../../domain/entities/subtask.dart';
 import '../providers/tasks_provider.dart';
+import '../../../../features/settings/domain/entities/app_settings.dart';
 import 'task_context_menu.dart';
 
 class TaskCard extends ConsumerStatefulWidget {
@@ -132,20 +133,23 @@ class _CardBody extends ConsumerWidget {
     final subtasksAsync = ref.watch(subtasksByTaskProvider(task.id));
     final subtasks = subtasksAsync.valueOrNull ?? [];
 
+    // Lee si Eat the Frog está habilitado en ajustes
+    final frogEnabled = ref.watch(settingsProvider).maybeWhen(
+      data: (s) => s.frogEnabled,
+      orElse: () => true,
+    );
+    final showFrog = task.isFrog && frogEnabled;
+
     final priorityColor = task.priority == Priority.low
         ? Colors.transparent
         : Color(int.parse(task.priority.colorHex.replaceFirst('#', '0xFF')));
 
-    // ── Stack: fondo + barra de prioridad superpuesta ──────────────────
-    // Usar Stack en vez de Border con lados distintos evita el bug de
-    // invisibilidad que ocurre cuando Flutter no puede combinar BorderRadius
-    // con bordes de distinto grosor.
     return Stack(
       children: [
         // Tarjeta principal con borde uniforme
         Container(
           decoration: BoxDecoration(
-            color: task.isFrog
+            color: showFrog
                 ? theme.colorScheme.primaryContainer.withOpacity(0.35)
                 : theme.colorScheme.surfaceContainerLow,
             borderRadius: BorderRadius.circular(12),
@@ -193,7 +197,7 @@ class _CardBody extends ConsumerWidget {
                       ],
 
                       // Badge frog
-                      if (task.isFrog) ...[
+                      if (showFrog) ...[
                         _FrogBadge(),
                         const SizedBox(height: 3),
                       ],
@@ -261,6 +265,12 @@ class _CardBody extends ConsumerWidget {
                       if (!isDone && task.hasNote) ...[
                         const SizedBox(height: 5),
                         _Badge(icon: Icons.notes_rounded, label: 'nota'),
+                      ],
+
+                      // Badge fecha programada
+                      if (!isDone && task.isScheduled) ...[
+                        const SizedBox(height: 5),
+                        _ScheduledBadge(date: task.scheduledDate!),
                       ],
                     ],
                   ),
@@ -420,12 +430,17 @@ class _SubtaskPreview extends StatelessWidget {
             children: visible.map((s) => Padding(
               padding: const EdgeInsets.only(bottom: 2),
               child: Row(children: [
+                // Icono distinto si está promovida (movida a otra columna)
                 Icon(
-                  s.isDone
+                  s.isPromoted
+                      ? Icons.open_in_new_rounded
+                      : s.isDone
                       ? Icons.check_box_rounded
                       : Icons.check_box_outline_blank_rounded,
                   size: 12,
-                  color: s.isDone
+                  color: s.isPromoted
+                      ? theme.colorScheme.onSurface.withOpacity(0.25)
+                      : s.isDone
                       ? theme.colorScheme.primary
                       : theme.colorScheme.onSurface.withOpacity(0.4),
                 ),
@@ -435,11 +450,15 @@ class _SubtaskPreview extends StatelessWidget {
                     s.title,
                     style: theme.textTheme.bodySmall?.copyWith(
                       fontSize: 11,
-                      color: s.isDone
+                      color: s.isPromoted
+                          ? theme.colorScheme.onSurface.withOpacity(0.25)
+                          : s.isDone
                           ? theme.colorScheme.onSurface.withOpacity(0.3)
                           : theme.colorScheme.onSurface.withOpacity(0.6),
-                      decoration:
-                      s.isDone ? TextDecoration.lineThrough : null,
+                      decoration: (s.isDone && !s.isPromoted)
+                          ? TextDecoration.lineThrough
+                          : null,
+                      fontStyle: s.isPromoted ? FontStyle.italic : null,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -552,5 +571,44 @@ class _Badge extends StatelessWidget {
           style:
           Theme.of(context).textTheme.labelSmall?.copyWith(color: color)),
     ]);
+  }
+}
+
+// ─── Badge de fecha programada ────────────────────────────────────────────────
+
+class _ScheduledBadge extends StatelessWidget {
+  const _ScheduledBadge({required this.date});
+  final DateTime date;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final d = DateTime(date.year, date.month, date.day);
+
+    final String label;
+    if (d == today) {
+      label = '📅 hoy';
+    } else if (d == today.add(const Duration(days: 1))) {
+      label = '📅 mañana';
+    } else {
+      label = '📅 ${date.day}/${date.month}';
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.tertiaryContainer.withOpacity(0.6),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        label,
+        style: theme.textTheme.labelSmall?.copyWith(
+          fontSize: 10,
+          color: theme.colorScheme.tertiary,
+        ),
+      ),
+    );
   }
 }

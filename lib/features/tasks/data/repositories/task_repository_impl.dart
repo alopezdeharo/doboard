@@ -60,6 +60,35 @@ class TaskRepositoryImpl implements ITaskRepository {
   Future<void> toggleDone(String id, {required bool isDone}) =>
       _db.tasksDao.toggleDone(id, isDone: isDone);
 
+  /// Cuando una tarea promovida cambia de estado, busca la subtarea
+  /// original por nombre y la sincroniza en la tarea padre.
+  @override
+  Future<void> syncPromotedSubtaskDone(String taskId,
+      {required bool isDone}) async {
+    final task = await _db.tasksDao.getTaskById(taskId);
+    if (task == null || task.parentTaskTitle == null) return;
+
+    // Buscar la tarea padre por título
+    final parents = await (_db.select(_db.tasks)
+      ..where((t) => t.title.equals(task.parentTaskTitle!)))
+        .get();
+    if (parents.isEmpty) return;
+
+    for (final parent in parents) {
+      // Buscar la subtarea con el mismo título
+      final subs = await (_db.select(_db.subtasks)
+        ..where((s) =>
+        s.taskId.equals(parent.id) &
+        s.title.equals(task.title) &
+        s.isPromoted.equals(true)))
+          .get();
+      for (final sub in subs) {
+        await (_db.update(_db.subtasks)..where((s) => s.id.equals(sub.id)))
+            .write(SubtasksCompanion(isDone: Value(isDone)));
+      }
+    }
+  }
+
   @override
   Future<void> moveToBoard(String taskId, String targetBoardId) =>
       _db.tasksDao.moveToBoard(taskId, targetBoardId);
@@ -78,7 +107,8 @@ class TaskRepositoryImpl implements ITaskRepository {
   }
 
   @override
-  Future<void> clearCompleted(String boardId) => _db.tasksDao.clearCompleted(boardId);
+  Future<void> clearCompleted(String boardId) =>
+      _db.tasksDao.clearCompleted(boardId);
 
   @override
   Future<int> countPendingByBoard(String boardId) =>
@@ -89,6 +119,29 @@ class TaskRepositoryImpl implements ITaskRepository {
     final data = await _db.tasksDao.getTaskById(taskId);
     if (data == null) return;
     return _db.tasksDao.duplicateTask(data, _uuid.v4());
+  }
+
+  @override
+  Future<void> scheduleTask(String taskId, DateTime date) {
+    return (_db.update(_db.tasks)..where((t) => t.id.equals(taskId))).write(
+      TasksCompanion(
+        scheduledDate: Value(date.millisecondsSinceEpoch),
+        updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
+      ),
+    );
+  }
+
+  @override
+  Future<void> cancelSchedule(String taskId) {
+    return (_db.update(_db.tasks)..where((t) => t.id.equals(taskId))).write(
+      const TasksCompanion(scheduledDate: Value(null)),
+    );
+  }
+
+  @override
+  Future<int> processScheduledTasks(String todayBoardId) {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    return _db.tasksDao.moveScheduledTasksToToday(todayBoardId, now);
   }
 
   // ─── Subtareas ─────────────────────────────────────────────────────────────
@@ -129,8 +182,6 @@ class TaskRepositoryImpl implements ITaskRepository {
     return _db.subtasksDao.reorderSubtasks(positions);
   }
 
-  /// Promueve una subtarea a tarea en otra columna.
-  /// La subtarea queda como "fantasma" (isPromoted=true) en la lista del padre.
   @override
   Future<void> promoteSubtaskToTask({
     required String subtaskId,
@@ -146,12 +197,10 @@ class TaskRepositoryImpl implements ITaskRepository {
     final now = DateTime.now().millisecondsSinceEpoch;
 
     await _db.transaction(() async {
-      // Marcar como promovida (fantasma) en vez de eliminar
       await ((_db.update(_db.subtasks))
         ..where((s) => s.id.equals(subtaskId)))
           .write(const SubtasksCompanion(isPromoted: Value(true)));
 
-      // Crear la tarea nueva con referencia al padre
       await _db.tasksDao.insertTask(TasksCompanion(
         id: Value(_uuid.v4()),
         boardId: Value(targetBoardId),

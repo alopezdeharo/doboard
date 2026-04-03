@@ -6,6 +6,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/providers/repository_providers.dart';
+import '../../../../features/settings/domain/entities/app_settings.dart';
 import '../../domain/entities/task.dart';
 import '../../domain/entities/priority.dart';
 import '../../domain/entities/subtask.dart';
@@ -56,6 +57,12 @@ class _TaskDetailView extends HookConsumerWidget {
     final isEditingContent = useState(false);
     final selectedPriority = useState(task.priority);
     final actions = ref.read(taskActionsProvider.notifier);
+
+    final frogEnabled = ref.watch(settingsProvider).maybeWhen(
+      data: (s) => s.frogEnabled,
+      orElse: () => true,
+    );
+    final showFrog = task.isFrog && frogEnabled;
 
     void saveTitle() {
       final v = titleCtrl.text.trim();
@@ -108,7 +115,7 @@ class _TaskDetailView extends HookConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        if (task.isFrog) ...[
+                        if (showFrog) ...[
                           _FrogBanner(),
                           const SizedBox(height: 12),
                         ],
@@ -617,14 +624,21 @@ class _SubtaskItem extends ConsumerWidget {
               children: [
                 Text(subtask.title,
                     style: theme.textTheme.bodyMedium?.copyWith(
+                      // Promovida+completada: tachado gris más oscuro
+                      // Promovida+pendiente: gris atenuado sin tachar
+                      // Normal+completada: tachado
                       color: isPromoted
-                          ? theme.colorScheme.onSurface.withOpacity(0.3)
+                          ? subtask.isDone
+                          ? theme.colorScheme.onSurface.withOpacity(0.25)
+                          : theme.colorScheme.onSurface.withOpacity(0.35)
                           : subtask.isDone
                           ? theme.colorScheme.onSurface.withOpacity(0.35)
                           : null,
-                      decoration: subtask.isDone && !isPromoted
+                      decoration: subtask.isDone
                           ? TextDecoration.lineThrough
                           : null,
+                      decorationColor:
+                      theme.colorScheme.onSurface.withOpacity(0.3),
                     )),
                 if (isPromoted)
                   Text('↳ movida a otra columna',

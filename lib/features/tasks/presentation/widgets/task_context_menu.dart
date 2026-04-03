@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../../domain/entities/task.dart';
 import '../providers/tasks_provider.dart';
 import '../../../../features/boards/presentation/providers/boards_provider.dart';
+import '../../../../features/settings/domain/entities/app_settings.dart';
 
 class TaskContextMenu extends ConsumerWidget {
   const TaskContextMenu({
@@ -24,6 +25,12 @@ class TaskContextMenu extends ConsumerWidget {
     final theme = Theme.of(context);
     final actions = ref.read(taskActionsProvider.notifier);
     final boardsAsync = ref.watch(visibleBoardsProvider);
+
+    // Leer si Eat the Frog está habilitado
+    final frogEnabled = ref.watch(settingsProvider).maybeWhen(
+      data: (s) => s.frogEnabled,
+      orElse: () => true,
+    );
 
     final otherBoards = boardsAsync.maybeWhen(
       data: (boards) => boards.where((b) => b.id != boardId).toList(),
@@ -50,7 +57,6 @@ class TaskContextMenu extends ConsumerWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // ── Completar ────────────────────────────────────────────
           _MenuItem(
             icon: task.isDone
                 ? Icons.undo_rounded
@@ -63,8 +69,6 @@ class TaskContextMenu extends ConsumerWidget {
             },
           ),
           _Divider(),
-
-          // ── Ver / editar ─────────────────────────────────────────
           _MenuItem(
             icon: Icons.edit_note_rounded,
             label: 'Ver / editar',
@@ -91,17 +95,15 @@ class TaskContextMenu extends ConsumerWidget {
           ),
           _Divider(),
 
-          // ── Programar ────────────────────────────────────────────
+          // Programar — texto actualizado y más claro
           _MenuItem(
             icon: task.isScheduled
                 ? Icons.event_busy_rounded
                 : Icons.event_rounded,
             label: task.isScheduled
                 ? 'Programada: ${_formatDate(task.scheduledDate!)} · Cancelar'
-                : 'Programar para Hoy...',
-            color: task.isScheduled
-                ? theme.colorScheme.tertiary
-                : null,
+                : 'Programar tarea',
+            color: task.isScheduled ? theme.colorScheme.tertiary : null,
             onTap: () async {
               onClose();
               if (task.isScheduled) {
@@ -113,7 +115,7 @@ class TaskContextMenu extends ConsumerWidget {
           ),
           _Divider(),
 
-          // ── Mover a otro tablero ─────────────────────────────────
+          // Mover a otro tablero
           if (otherBoards.isNotEmpty) ...[
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 8, 14, 4),
@@ -140,18 +142,22 @@ class TaskContextMenu extends ConsumerWidget {
             _Divider(),
           ],
 
-          // ── Frog ─────────────────────────────────────────────────
-          _MenuItem(
-            icon: null,
-            emoji: '🐸',
-            label: task.isFrog ? 'Quitar rana' : 'Marcar como rana',
-            onTap: () {
-              task.isFrog
-                  ? actions.removeFrog(task.id)
-                  : actions.setFrog(task.id, boardId);
-              onClose();
-            },
-          ),
+          // Frog — solo visible si está habilitado en ajustes
+          if (frogEnabled) ...[
+            _MenuItem(
+              icon: null,
+              emoji: '🐸',
+              label: task.isFrog ? 'Quitar rana' : 'Marcar como rana',
+              onTap: () {
+                task.isFrog
+                    ? actions.removeFrog(task.id)
+                    : actions.setFrog(task.id, boardId);
+                onClose();
+              },
+            ),
+            _Divider(),
+          ],
+
           _MenuItem(
             icon: Icons.copy_rounded,
             label: 'Duplicar',
@@ -161,8 +167,6 @@ class TaskContextMenu extends ConsumerWidget {
             },
           ),
           _Divider(),
-
-          // ── Eliminar ─────────────────────────────────────────────
           _MenuItem(
             icon: Icons.delete_outline_rounded,
             label: 'Eliminar',
@@ -179,9 +183,10 @@ class TaskContextMenu extends ConsumerWidget {
 
   String _formatDate(DateTime date) {
     final now = DateTime.now();
-    final tomorrow = DateTime(now.year, now.month, now.day + 1);
+    final today = DateTime(now.year, now.month, now.day);
+    final tomorrow = today.add(const Duration(days: 1));
     final d = DateTime(date.year, date.month, date.day);
-    if (d == DateTime(now.year, now.month, now.day)) return 'hoy';
+    if (d == today) return 'hoy';
     if (d == tomorrow) return 'mañana';
     return DateFormat('d MMM', 'es').format(date);
   }
@@ -194,12 +199,11 @@ class TaskContextMenu extends ConsumerWidget {
       initialDate: now.add(const Duration(days: 1)),
       firstDate: now,
       lastDate: now.add(const Duration(days: 365)),
-      helpText: 'Mover a Hoy en esta fecha',
+      helpText: 'La tarea se moverá a "Hoy" en esta fecha',
       confirmText: 'Programar',
       cancelText: 'Cancelar',
     );
     if (picked != null) {
-      // Programar para las 00:00 del día seleccionado
       final scheduled = DateTime(picked.year, picked.month, picked.day);
       ref.read(taskActionsProvider.notifier).scheduleTask(task.id, scheduled);
     }

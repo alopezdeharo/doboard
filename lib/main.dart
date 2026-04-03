@@ -16,44 +16,46 @@ void main() async {
     statusBarBrightness: Brightness.light,
   ));
 
+  // Lanzar la UI inmediatamente, sin esperar nada
   runApp(
     ProviderScope(
-      child: _AppInitializer(child: const DoboardApp()),
+      child: _ScheduledTasksRunner(child: const DoboardApp()),
     ),
   );
 }
 
-/// Procesa tareas programadas al arrancar la app.
-class _AppInitializer extends ConsumerStatefulWidget {
-  const _AppInitializer({required this.child});
+/// Ejecuta el procesado de tareas programadas en background
+/// sin bloquear ni retrasar el render inicial de la app.
+class _ScheduledTasksRunner extends ConsumerStatefulWidget {
+  const _ScheduledTasksRunner({required this.child});
   final Widget child;
 
   @override
-  ConsumerState<_AppInitializer> createState() => _AppInitializerState();
+  ConsumerState<_ScheduledTasksRunner> createState() =>
+      _ScheduledTasksRunnerState();
 }
 
-class _AppInitializerState extends ConsumerState<_AppInitializer> {
+class _ScheduledTasksRunnerState extends ConsumerState<_ScheduledTasksRunner> {
   @override
   void initState() {
     super.initState();
-    // Lanzar en post-frame para que los providers estén listos
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _processScheduledTasks();
-    });
+    // Fire-and-forget: no bloquea el arranque
+    _runAfterFirstFrame();
   }
 
-  Future<void> _processScheduledTasks() async {
-    try {
-      // El tablero "Hoy" siempre es el primero visible (board-hoy)
-      final moved = await ref
-          .read(taskRepositoryProvider)
-          .processScheduledTasks('board-hoy');
-      if (moved > 0) {
-        debugPrint('doboard: $moved tarea(s) movida(s) a Hoy por programación');
-      }
-    } catch (e) {
-      debugPrint('doboard: error procesando tareas programadas: $e');
-    }
+  void _runAfterFirstFrame() {
+    // Espera al segundo frame para garantizar que la DB ya está abierta
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future.microtask(() async {
+        try {
+          await ref
+              .read(taskRepositoryProvider)
+              .processScheduledTasks('board-hoy');
+        } catch (_) {
+          // No crítico — se reintentará en el próximo arranque
+        }
+      });
+    });
   }
 
   @override

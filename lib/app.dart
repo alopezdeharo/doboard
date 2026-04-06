@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'core/providers/repository_providers.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'features/settings/domain/entities/app_settings.dart';
+import 'core/providers/database_provider.dart';
 
 class DoboardApp extends ConsumerStatefulWidget {
   const DoboardApp({super.key});
@@ -29,19 +29,14 @@ class _DoboardAppState extends ConsumerState<DoboardApp>
     super.dispose();
   }
 
-  /// Al volver de background, refresca los streams de datos para evitar
-  /// la pantalla negra por pérdida de estado / conexión Drift.
+  /// Drift con WAL gestiona la reconexión de SQLite automáticamente
+  /// al volver de background. Invalidar appDatabaseProvider era demasiado
+  /// agresivo: reiniciaba todos los streams y causaba que se mostrara
+  /// momentáneamente el contenido del tablero 0 (Hoy) independientemente
+  /// del tablero activo.
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      // Invalida el provider de la DB para que Drift rehidrate la conexión
-      // si el proceso fue suspendido por Android con memoria baja.
-      try {
-        ref.invalidate(appDatabaseProvider);
-      } catch (_) {
-        // Ignorar si el provider ya fue desechado
-      }
-    }
+    // Sin acción necesaria: los streams de Drift se recuperan solos.
   }
 
   @override

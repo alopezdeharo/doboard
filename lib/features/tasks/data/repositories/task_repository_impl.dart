@@ -4,6 +4,7 @@ import 'package:doboard/features/tasks/domain/entities/task.dart';
 import 'package:doboard/features/tasks/domain/repositories/i_task_repository.dart';
 import 'package:doboard/shared/database/app_database.dart';
 import 'package:doboard/shared/database/mappers.dart';
+import 'package:doboard/core/services/notification_service.dart';
 import 'package:drift/drift.dart';
 import 'package:uuid/uuid.dart';
 
@@ -40,18 +41,25 @@ class TaskRepositoryImpl implements ITaskRepository {
   }) {
     final now = DateTime.now().millisecondsSinceEpoch;
     return _db.tasksDao.insertTask(TasksCompanion(
-      id: Value(id), boardId: Value(boardId), title: Value(title),
-      content: Value(content), priority: Value(priority.value),
-      position: const Value(0), isDone: const Value(false),
-      isFrog: const Value(false), isPinned: const Value(false),
+      id: Value(id),
+      boardId: Value(boardId),
+      title: Value(title),
+      content: Value(content),
+      priority: Value(priority.value),
+      position: const Value(0),
+      isDone: const Value(false),
+      isFrog: const Value(false),
+      isPinned: const Value(false),
       detectedKeyword: Value(detectedKeyword),
       parentTaskTitle: Value(parentTaskTitle),
-      createdAt: Value(now), updatedAt: Value(now),
+      createdAt: Value(now),
+      updatedAt: Value(now),
     ));
   }
 
   @override
-  Future<void> updateTask(Task task) => _db.tasksDao.updateTask(task.toCompanion());
+  Future<void> updateTask(Task task) =>
+      _db.tasksDao.updateTask(task.toCompanion());
 
   @override
   Future<void> deleteTask(String id) => _db.tasksDao.deleteTask(id);
@@ -60,22 +68,18 @@ class TaskRepositoryImpl implements ITaskRepository {
   Future<void> toggleDone(String id, {required bool isDone}) =>
       _db.tasksDao.toggleDone(id, isDone: isDone);
 
-  /// Cuando una tarea promovida cambia de estado, busca la subtarea
-  /// original por nombre y la sincroniza en la tarea padre.
   @override
   Future<void> syncPromotedSubtaskDone(String taskId,
       {required bool isDone}) async {
     final task = await _db.tasksDao.getTaskById(taskId);
     if (task == null || task.parentTaskTitle == null) return;
 
-    // Buscar la tarea padre por título
     final parents = await (_db.select(_db.tasks)
       ..where((t) => t.title.equals(task.parentTaskTitle!)))
         .get();
     if (parents.isEmpty) return;
 
     for (final parent in parents) {
-      // Buscar la subtarea con el mismo título
       final subs = await (_db.select(_db.subtasks)
         ..where((s) =>
         s.taskId.equals(parent.id) &
@@ -102,7 +106,9 @@ class TaskRepositoryImpl implements ITaskRepository {
 
   @override
   Future<void> reorderTasks(String boardId, List<String> orderedIds) {
-    final positions = {for (var i = 0; i < orderedIds.length; i++) orderedIds[i]: i};
+    final positions = {
+      for (var i = 0; i < orderedIds.length; i++) orderedIds[i]: i
+    };
     return _db.tasksDao.reorderTasks(positions);
   }
 
@@ -122,26 +128,42 @@ class TaskRepositoryImpl implements ITaskRepository {
   }
 
   @override
-  Future<void> scheduleTask(String taskId, DateTime date) {
-    return (_db.update(_db.tasks)..where((t) => t.id.equals(taskId))).write(
+  Future<void> scheduleTask(String taskId, DateTime date) async {
+    await (_db.update(_db.tasks)..where((t) => t.id.equals(taskId))).write(
       TasksCompanion(
         scheduledDate: Value(date.millisecondsSinceEpoch),
         updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
       ),
     );
+    // Obtener título para el texto de la notificación
+    final task = await _db.tasksDao.getTaskById(taskId);
+    if (task != null) {
+      await NotificationService.instance.scheduleTaskNotification(
+        taskId: taskId,
+        taskTitle: task.title,
+        scheduledDate: date,
+      );
+    }
   }
 
   @override
-  Future<void> cancelSchedule(String taskId) {
-    return (_db.update(_db.tasks)..where((t) => t.id.equals(taskId))).write(
+  Future<void> cancelSchedule(String taskId) async {
+    await (_db.update(_db.tasks)..where((t) => t.id.equals(taskId))).write(
       const TasksCompanion(scheduledDate: Value(null)),
     );
+    await NotificationService.instance.cancelTaskNotification(taskId);
   }
 
   @override
-  Future<int> processScheduledTasks(String todayBoardId) {
+  Future<int> processScheduledTasks(String todayBoardId) async {
     final now = DateTime.now().millisecondsSinceEpoch;
-    return _db.tasksDao.moveScheduledTasksToToday(todayBoardId, now);
+    final count = await _db.tasksDao.moveScheduledTasksToToday(todayBoardId, now);
+    // Notificación inmediata de resumen (fallback si el usuario no vio
+    // la notificación programada por OS)
+    if (count > 0) {
+      await NotificationService.instance.showTasksMovedNotification(count);
+    }
+    return count;
   }
 
   // ─── Subtareas ─────────────────────────────────────────────────────────────
@@ -159,9 +181,13 @@ class TaskRepositoryImpl implements ITaskRepository {
   }) {
     final now = DateTime.now().millisecondsSinceEpoch;
     return _db.subtasksDao.insertSubtask(SubtasksCompanion(
-      id: Value(id), taskId: Value(taskId), title: Value(title),
-      isDone: const Value(false), position: const Value(0),
-      isPromoted: const Value(false), createdAt: Value(now),
+      id: Value(id),
+      taskId: Value(taskId),
+      title: Value(title),
+      isDone: const Value(false),
+      position: const Value(0),
+      isPromoted: const Value(false),
+      createdAt: Value(now),
     ));
   }
 
@@ -178,7 +204,9 @@ class TaskRepositoryImpl implements ITaskRepository {
 
   @override
   Future<void> reorderSubtasks(String taskId, List<String> orderedIds) {
-    final positions = {for (var i = 0; i < orderedIds.length; i++) orderedIds[i]: i};
+    final positions = {
+      for (var i = 0; i < orderedIds.length; i++) orderedIds[i]: i
+    };
     return _db.subtasksDao.reorderSubtasks(positions);
   }
 

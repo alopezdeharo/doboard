@@ -20,7 +20,9 @@ abstract interface class ITaskRepository {
   Future<void> updateTask(Task task);
   Future<void> deleteTask(String id);
   Future<void> toggleDone(String id, {required bool isDone});
+
   Future<void> moveToBoard(String taskId, String targetBoardId);
+
   Future<void> setFrog(String taskId, String boardId);
   Future<void> removeFrog(String taskId);
   Future<void> reorderTasks(String boardId, List<String> orderedIds);
@@ -39,7 +41,6 @@ abstract interface class ITaskRepository {
   Future<void> cancelSchedule(String taskId);
 
   /// Mueve a "Hoy" todas las tareas cuya fecha programada ya llegó.
-  /// Se llama al abrir la app.
   Future<int> processScheduledTasks(String todayBoardId);
 
   Stream<List<Subtask>> watchSubtasksByTask(String taskId);

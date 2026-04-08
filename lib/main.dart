@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app.dart';
 import 'core/providers/repository_providers.dart';
+import 'core/services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -15,6 +16,9 @@ void main() async {
     statusBarIconBrightness: Brightness.dark,
     statusBarBrightness: Brightness.light,
   ));
+
+  // Inicializar notificaciones (registra canales Android, configura iOS)
+  await NotificationService.instance.initialize();
 
   // Lanzar la UI inmediatamente, sin esperar nada
   runApp(

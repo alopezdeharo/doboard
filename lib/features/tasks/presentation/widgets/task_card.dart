@@ -12,9 +12,15 @@ import '../../../../features/settings/domain/entities/app_settings.dart';
 import 'task_context_menu.dart';
 
 class TaskCard extends ConsumerStatefulWidget {
-  const TaskCard({super.key, required this.task, required this.boardId});
+  const TaskCard({
+    super.key,
+    required this.task,
+    required this.boardId,
+    required this.index,
+  });
   final Task task;
   final String boardId;
+  final int index;
 
   @override
   ConsumerState<TaskCard> createState() => _TaskCardState();
@@ -90,6 +96,7 @@ class _TaskCardState extends ConsumerState<TaskCard> {
             child: _CardBody(
               task: task,
               boardId: widget.boardId,
+              index: widget.index,
               onMenuTap: _toggleMenu,
             ),
           ),
@@ -116,11 +123,13 @@ class _CardBody extends ConsumerWidget {
   const _CardBody({
     required this.task,
     required this.boardId,
+    required this.index,
     required this.onMenuTap,
   });
 
   final Task task;
   final String boardId;
+  final int index;
   final VoidCallback onMenuTap;
 
   @override
@@ -133,7 +142,6 @@ class _CardBody extends ConsumerWidget {
     final subtasksAsync = ref.watch(subtasksByTaskProvider(task.id));
     final subtasks = subtasksAsync.valueOrNull ?? [];
 
-    // Lee si Eat the Frog está habilitado en ajustes
     final frogEnabled = ref.watch(settingsProvider).maybeWhen(
       data: (s) => s.frogEnabled,
       orElse: () => true,
@@ -146,7 +154,6 @@ class _CardBody extends ConsumerWidget {
 
     return Stack(
       children: [
-        // Tarjeta principal con borde uniforme
         Container(
           decoration: BoxDecoration(
             color: showFrog
@@ -159,14 +166,10 @@ class _CardBody extends ConsumerWidget {
             ),
           ),
           child: Padding(
-            // Padding extra izquierda cuando hay prioridad para que el
-            // contenido no quede tapado por la barra de color
-            padding: EdgeInsets.fromLTRB(
-                hasPriority ? 13 : 10, 9, 6, 9),
+            padding: EdgeInsets.fromLTRB(hasPriority ? 13 : 10, 9, 6, 9),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ── Checkbox ────────────────────────────────────────
                 _AnimatedCheckbox(
                   isDone: isDone,
                   priority: task.priority,
@@ -176,33 +179,27 @@ class _CardBody extends ConsumerWidget {
                   },
                 ),
                 const SizedBox(width: 9),
-
-                // ── Contenido ────────────────────────────────────────
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Referencia a tarea padre (si fue subtarea)
                       if (task.isPromotedSubtask) ...[
                         Text(
                           '↳ ${task.parentTaskTitle}',
                           style: theme.textTheme.bodySmall?.copyWith(
                             fontSize: 10,
-                            color: theme.colorScheme.onSurface.withOpacity(0.4),
+                            color:
+                            theme.colorScheme.onSurface.withOpacity(0.4),
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 2),
                       ],
-
-                      // Badge frog
                       if (showFrog) ...[
                         _FrogBadge(),
                         const SizedBox(height: 3),
                       ],
-
-                      // Título + keyword
                       Row(children: [
                         Expanded(
                           child: Text(
@@ -226,8 +223,6 @@ class _CardBody extends ConsumerWidget {
                               style: const TextStyle(fontSize: 14)),
                         ],
                       ]),
-
-                      // Preview descripción
                       if (task.content != null &&
                           task.content!.isNotEmpty &&
                           !isDone) ...[
@@ -247,7 +242,8 @@ class _CardBody extends ConsumerWidget {
                           child: Text(
                             task.content!,
                             style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurface.withOpacity(0.5),
+                              color:
+                              theme.colorScheme.onSurface.withOpacity(0.5),
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.clip,
@@ -255,19 +251,16 @@ class _CardBody extends ConsumerWidget {
                         ),
                       ],
 
-                      // Preview subtareas
+                      // ── Preview subtareas ─────────────────────────────
                       if (!isDone && subtasks.isNotEmpty) ...[
                         const SizedBox(height: 6),
                         _SubtaskPreview(subtasks: subtasks),
                       ],
 
-                      // Badge nota
                       if (!isDone && task.hasNote) ...[
                         const SizedBox(height: 5),
                         _Badge(icon: Icons.notes_rounded, label: 'nota'),
                       ],
-
-                      // Badge fecha programada
                       if (!isDone && task.isScheduled) ...[
                         const SizedBox(height: 5),
                         _ScheduledBadge(date: task.scheduledDate!),
@@ -275,8 +268,6 @@ class _CardBody extends ConsumerWidget {
                     ],
                   ),
                 ),
-
-                // ── Botón subtarea rápida ↳ ──────────────────────────
                 GestureDetector(
                   onTap: () => _showQuickSubtaskInput(context, ref, task),
                   behavior: HitTestBehavior.opaque,
@@ -289,13 +280,11 @@ class _CardBody extends ConsumerWidget {
                     ),
                   ),
                 ),
-
-                // ── Botón menú ⋮ ─────────────────────────────────────
                 GestureDetector(
                   onTap: onMenuTap,
                   behavior: HitTestBehavior.opaque,
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(4, 0, 4, 0),
+                    padding: const EdgeInsets.fromLTRB(4, 0, 2, 0),
                     child: Icon(
                       Icons.more_vert_rounded,
                       size: 18,
@@ -303,12 +292,24 @@ class _CardBody extends ConsumerWidget {
                     ),
                   ),
                 ),
+                // ── Handle de reordenamiento ≡ ─────────────────────────
+                // Arrastrar este icono reordena dentro del tablero sin
+                // interferir con el LongPressDraggable (cambio de tablero).
+                ReorderableDragStartListener(
+                  index: index,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(2, 0, 4, 0),
+                    child: Icon(
+                      Icons.drag_handle_rounded,
+                      size: 18,
+                      color: theme.colorScheme.onSurface.withOpacity(0.22),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
         ),
-
-        // Barra de prioridad superpuesta (izquierda)
         if (hasPriority)
           Positioned(
             left: 0,
@@ -356,8 +357,7 @@ class _CardBody extends ConsumerWidget {
               controller: controller,
               autofocus: true,
               textCapitalization: TextCapitalization.sentences,
-              style: TextStyle(
-                  color: Theme.of(ctx).colorScheme.onSurface),
+              style: TextStyle(color: Theme.of(ctx).colorScheme.onSurface),
               cursorColor: Theme.of(ctx).colorScheme.primary,
               decoration: InputDecoration(
                 hintText: 'Nueva subtarea en "${task.title}"...',
@@ -396,6 +396,9 @@ class _CardBody extends ConsumerWidget {
 }
 
 // ─── Preview subtareas con fade ───────────────────────────────────────────────
+// FIX PROBLEMA 1: Una subtarea promovida que además está completada (isDone=true)
+// ahora muestra ícono de check (atenuado) y texto tachado, igual que una subtarea
+// normal completada. Antes siempre mostraba el ícono "open_in_new" sin tachar.
 
 class _SubtaskPreview extends StatelessWidget {
   const _SubtaskPreview({required this.subtasks});
@@ -427,21 +430,27 @@ class _SubtaskPreview extends StatelessWidget {
           blendMode: BlendMode.dstIn,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: visible.map((s) => Padding(
+            children: visible
+                .map((s) => Padding(
               padding: const EdgeInsets.only(bottom: 2),
               child: Row(children: [
-                // Icono distinto si está promovida (movida a otra columna)
+                // ── Ícono: si está done → check (con opacidad
+                // reducida si además es promoted).
+                // Si es promoted pero NO done → open_in_new.
+                // Si no es promoted y no está done → checkbox vacío.
                 Icon(
-                  s.isPromoted
-                      ? Icons.open_in_new_rounded
-                      : s.isDone
+                  s.isDone
                       ? Icons.check_box_rounded
+                      : s.isPromoted
+                      ? Icons.open_in_new_rounded
                       : Icons.check_box_outline_blank_rounded,
                   size: 12,
-                  color: s.isPromoted
+                  color: s.isDone
+                      ? (s.isPromoted
+                      ? theme.colorScheme.primary.withOpacity(0.4)
+                      : theme.colorScheme.primary)
+                      : s.isPromoted
                       ? theme.colorScheme.onSurface.withOpacity(0.25)
-                      : s.isDone
-                      ? theme.colorScheme.primary
                       : theme.colorScheme.onSurface.withOpacity(0.4),
                 ),
                 const SizedBox(width: 4),
@@ -450,22 +459,30 @@ class _SubtaskPreview extends StatelessWidget {
                     s.title,
                     style: theme.textTheme.bodySmall?.copyWith(
                       fontSize: 11,
-                      color: s.isPromoted
-                          ? theme.colorScheme.onSurface.withOpacity(0.25)
-                          : s.isDone
+                      color: s.isDone
                           ? theme.colorScheme.onSurface.withOpacity(0.3)
-                          : theme.colorScheme.onSurface.withOpacity(0.6),
-                      decoration: (s.isDone && !s.isPromoted)
+                          : s.isPromoted
+                          ? theme.colorScheme.onSurface
+                          .withOpacity(0.25)
+                          : theme.colorScheme.onSurface
+                          .withOpacity(0.6),
+                      // Tachado cuando isDone, independientemente de
+                      // si también es promovida.
+                      decoration: s.isDone
                           ? TextDecoration.lineThrough
                           : null,
-                      fontStyle: s.isPromoted ? FontStyle.italic : null,
+                      decorationColor:
+                      theme.colorScheme.onSurface.withOpacity(0.3),
+                      fontStyle:
+                      s.isPromoted ? FontStyle.italic : null,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ]),
-            )).toList(),
+            ))
+                .toList(),
           ),
         ),
         if (remaining > 0)

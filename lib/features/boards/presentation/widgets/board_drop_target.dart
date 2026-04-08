@@ -90,7 +90,7 @@ class _BoardTargetState extends State<_BoardTarget> {
       onLeave: (_) => setState(() => _isHovered = false),
       onAcceptWithDetails: (details) {
         setState(() => _isHovered = false);
-        widget.onDrop(details.data);
+        widget.onDrop(details.data); // fire-and-forget: el picker es modal
       },
       builder: (_, candidateData, __) {
         return AnimatedContainer(
@@ -111,8 +111,7 @@ class _BoardTargetState extends State<_BoardTarget> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(widget.board.emoji,
-                  style: const TextStyle(fontSize: 18)),
+              Text(widget.board.emoji, style: const TextStyle(fontSize: 18)),
               const SizedBox(height: 4),
               Text(
                 widget.board.name,
@@ -133,7 +132,8 @@ class _BoardTargetState extends State<_BoardTarget> {
   }
 }
 
-/// Target para cancelar el drag (tablero actual).
+// ─── Target para cancelar el drag ─────────────────────────────────────────────
+
 class _CancelTarget extends StatelessWidget {
   const _CancelTarget({required this.onCancel});
   final VoidCallback onCancel;
@@ -159,10 +159,7 @@ class _CancelTarget extends StatelessWidget {
             SizedBox(height: 4),
             Text(
               'Cancelar',
-              style: TextStyle(
-                color: Colors.white60,
-                fontSize: 11,
-              ),
+              style: TextStyle(color: Colors.white60, fontSize: 11),
               textAlign: TextAlign.center,
             ),
           ],

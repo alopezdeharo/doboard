@@ -75,7 +75,7 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
         boardId: Value(targetBoardId),
         isFrog: const Value(false),
         position: const Value(0),
-        scheduledDate: const Value(null), // limpiar fecha al mover manualmente
+        scheduledDate: const Value(null),
         updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
       ),
     );
@@ -138,7 +138,6 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
     ));
   }
 
-  /// Devuelve tareas cuya fecha programada ya ha llegado y no están en "Hoy".
   Future<List<TaskData>> getTasksDueToMove(
       String todayBoardId, int nowMs) async {
     return (select(tasks)
@@ -150,7 +149,6 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
         .get();
   }
 
-  /// Mueve las tareas programadas a "Hoy" (se llama al abrir la app).
   Future<int> moveScheduledTasksToToday(
       String todayBoardId, int nowMs) async {
     return (update(tasks)

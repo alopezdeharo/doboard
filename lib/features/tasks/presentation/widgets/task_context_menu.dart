@@ -7,6 +7,7 @@ import '../../domain/entities/task.dart';
 import '../providers/tasks_provider.dart';
 import '../../../../features/boards/presentation/providers/boards_provider.dart';
 import '../../../../features/settings/domain/entities/app_settings.dart';
+import '../../../../core/services/notification_service.dart';
 
 class TaskContextMenu extends ConsumerWidget {
   const TaskContextMenu({
@@ -205,6 +206,10 @@ class TaskContextMenu extends ConsumerWidget {
     );
     if (picked != null) {
       final scheduled = DateTime(picked.year, picked.month, picked.day);
+      // Solicitar permiso de notificación la primera vez que el usuario
+      // programa una tarea. El sistema solo muestra el diálogo una vez;
+      // las siguientes llamadas devuelven el resultado ya guardado.
+      await NotificationService.instance.requestPermission();
       ref.read(taskActionsProvider.notifier).scheduleTask(task.id, scheduled);
     }
   }

@@ -46,9 +46,9 @@ class TaskCardDraggable extends ConsumerWidget {
       // Tarjeta original durante el drag: atenuada
       childWhenDragging: Opacity(
         opacity: 0.3,
-        child: TaskCard(task: task, boardId: boardId),
+        child: TaskCard(task: task, boardId: boardId, index: index),
       ),
-      child: TaskCard(task: task, boardId: boardId),
+      child: TaskCard(task: task, boardId: boardId, index: index),
     );
   }
 }
@@ -70,7 +70,7 @@ class _DragFeedback extends StatelessWidget {
         child: SizedBox(
           // Ancho fijo igual al ancho de pantalla menos padding del PageView
           width: MediaQuery.of(context).size.width * 0.84,
-          child: TaskCard(task: task, boardId: ''),
+          child: TaskCard(task: task, boardId: '', index: 0),
         ),
       ),
     );

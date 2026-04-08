@@ -82,6 +82,17 @@ dependencies:
   flutter_slidable: ^4.0.3
 
   # ─────────────────────────────────────────
+  # NOTIFICACIONES LOCALES
+  # ─────────────────────────────────────────
+
+  # flutter_local_notifications: notificaciones programadas por OS
+  # Se usa para avisar cuando una tarea programada llega a "Hoy"
+  flutter_local_notifications: ^17.2.2
+
+  # timezone: necesario para programar notificaciones en hora local exacta
+  timezone: ^0.9.4
+
+  # ─────────────────────────────────────────
   # UI — TEMA Y ESTILOS
   # ─────────────────────────────────────────
 

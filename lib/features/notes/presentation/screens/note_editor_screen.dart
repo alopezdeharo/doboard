@@ -110,16 +110,14 @@ class _NoteEditor extends HookConsumerWidget {
               decoration: BoxDecoration(
                 border: Border(
                   bottom: BorderSide(
-                    color:
-                    theme.colorScheme.outlineVariant.withOpacity(0.3),
+                    color: theme.colorScheme.outlineVariant.withOpacity(0.3),
                     width: 0.5,
                   ),
                 ),
               ),
               child: Row(children: [
                 IconButton(
-                  icon: const Icon(Icons.keyboard_arrow_down_rounded,
-                      size: 28),
+                  icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 28),
                   color: theme.colorScheme.onSurface.withOpacity(0.5),
                   onPressed: () async {
                     if (hasUnsaved.value) await save();
@@ -160,15 +158,19 @@ class _NoteEditor extends HookConsumerWidget {
             ),
 
             // ── Editor ─────────────────────────────────────────────────
+            // FIX PROBLEMA 2: El editor usa el QuillEditorConfig sin
+            // shortcuts manuales de lista — los botones del toolbar de abajo
+            // activan los formatos de lista explícitamente sin duplicar
+            // caracteres.
             Expanded(
               child: QuillEditor(
                 controller: quillController,
                 focusNode: focusNode,
                 scrollController: scrollController,
-                config: QuillEditorConfig(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+                config: const QuillEditorConfig(
+                  padding: EdgeInsets.fromLTRB(20, 16, 20, 16),
                   placeholder: 'Escribe tu nota aquí...',
-                  autoFocus: note == null,
+                  autoFocus: false,
                 ),
               ),
             ),
@@ -179,8 +181,7 @@ class _NoteEditor extends HookConsumerWidget {
                 color: theme.colorScheme.surface,
                 border: Border(
                   top: BorderSide(
-                    color:
-                    theme.colorScheme.outlineVariant.withOpacity(0.4),
+                    color: theme.colorScheme.outlineVariant.withOpacity(0.4),
                     width: 0.5,
                   ),
                 ),
@@ -188,68 +189,97 @@ class _NoteEditor extends HookConsumerWidget {
               child: SafeArea(
                 top: false,
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 4, vertical: 4),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _FormatBtn(
-                        icon: Icons.format_bold_rounded,
-                        tooltip: 'Negrita',
-                        attribute: Attribute.bold,
-                        controller: quillController,
-                        tick: toolbarTick.value,
-                      ),
-                      _FormatBtn(
-                        icon: Icons.format_italic_rounded,
-                        tooltip: 'Cursiva',
-                        attribute: Attribute.italic,
-                        controller: quillController,
-                        tick: toolbarTick.value,
-                      ),
-                      _FormatBtn(
-                        icon: Icons.format_underline_rounded,
-                        tooltip: 'Subrayado',
-                        attribute: Attribute.underline,
-                        controller: quillController,
-                        tick: toolbarTick.value,
-                      ),
-                      _FormatBtn(
-                        icon: Icons.format_strikethrough_rounded,
-                        tooltip: 'Tachado',
-                        attribute: Attribute.strikeThrough,
-                        controller: quillController,
-                        tick: toolbarTick.value,
-                      ),
-                      _Divider(),
-                      _FormatBtn(
-                        icon: Icons.check_box_outlined,
-                        tooltip: 'Checkbox',
-                        attribute: Attribute.unchecked,
-                        controller: quillController,
-                        tick: toolbarTick.value,
-                      ),
-                      _Divider(),
-                      _ColorBtn(
+                  padding:
+                  const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        // ── Formato inline ──────────────────────────────
+                        _FormatBtn(
+                          icon: Icons.format_bold_rounded,
+                          tooltip: 'Negrita',
+                          attribute: Attribute.bold,
                           controller: quillController,
-                          isBackground: false),
-                      _ColorBtn(
+                          tick: toolbarTick.value,
+                        ),
+                        _FormatBtn(
+                          icon: Icons.format_italic_rounded,
+                          tooltip: 'Cursiva',
+                          attribute: Attribute.italic,
                           controller: quillController,
-                          isBackground: true),
-                      _Divider(),
-                      _ActionBtn(
-                        icon: Icons.undo_rounded,
-                        tooltip: 'Deshacer',
-                        enabled: quillController.hasUndo,
-                        onTap: () => quillController.undo(),
-                      ),
-                      _ActionBtn(
-                        icon: Icons.redo_rounded,
-                        tooltip: 'Rehacer',
-                        enabled: quillController.hasRedo,
-                        onTap: () => quillController.redo(),
-                      ),
-                    ],
+                          tick: toolbarTick.value,
+                        ),
+                        _FormatBtn(
+                          icon: Icons.format_underline_rounded,
+                          tooltip: 'Subrayado',
+                          attribute: Attribute.underline,
+                          controller: quillController,
+                          tick: toolbarTick.value,
+                        ),
+                        _FormatBtn(
+                          icon: Icons.format_strikethrough_rounded,
+                          tooltip: 'Tachado',
+                          attribute: Attribute.strikeThrough,
+                          controller: quillController,
+                          tick: toolbarTick.value,
+                        ),
+                        _ToolbarDivider(),
+
+                        // ── Listas (FIX PROBLEMA 2) ─────────────────────
+                        // Se recuperan los formatos de lista como botones
+                        // explícitos en el toolbar en lugar de depender de
+                        // detección automática por texto. Esto evita tanto
+                        // la pérdida del formato como la duplicación de
+                        // caracteres que ocurría con la detección manual.
+                        _FormatBtn(
+                          icon: Icons.format_list_bulleted_rounded,
+                          tooltip: 'Lista con viñetas',
+                          attribute: Attribute.ul,
+                          controller: quillController,
+                          tick: toolbarTick.value,
+                        ),
+                        _FormatBtn(
+                          icon: Icons.format_list_numbered_rounded,
+                          tooltip: 'Lista numerada',
+                          attribute: Attribute.ol,
+                          controller: quillController,
+                          tick: toolbarTick.value,
+                        ),
+                        _ToolbarDivider(),
+
+                        // ── Checkbox ────────────────────────────────────
+                        _FormatBtn(
+                          icon: Icons.check_box_outlined,
+                          tooltip: 'Checkbox',
+                          attribute: Attribute.unchecked,
+                          controller: quillController,
+                          tick: toolbarTick.value,
+                        ),
+                        _ToolbarDivider(),
+
+                        // ── Color ───────────────────────────────────────
+                        _ColorBtn(
+                            controller: quillController, isBackground: false),
+                        _ColorBtn(
+                            controller: quillController, isBackground: true),
+                        _ToolbarDivider(),
+
+                        // ── Historial ───────────────────────────────────
+                        _ActionBtn(
+                          icon: Icons.undo_rounded,
+                          tooltip: 'Deshacer',
+                          enabled: quillController.hasUndo,
+                          onTap: () => quillController.undo(),
+                        ),
+                        _ActionBtn(
+                          icon: Icons.redo_rounded,
+                          tooltip: 'Rehacer',
+                          enabled: quillController.hasRedo,
+                          onTap: () => quillController.redo(),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -262,13 +292,16 @@ class _NoteEditor extends HookConsumerWidget {
 }
 
 // ─── Botón de formato con estado activo/inactivo ──────────────────────────────
+// FIX PROBLEMA 2: _isActive ahora reconoce Attribute.ul y Attribute.ol.
+// Los atributos de lista son de bloque (key='list', value='bullet'/'ordered'),
+// a diferencia de los inline (bold, italic…) que son booleanos.
 
 class _FormatBtn extends StatelessWidget {
   const _FormatBtn({
     required this.icon,
     required this.attribute,
     required this.controller,
-    required this.tick, // fuerza reconstrucción al cambiar selección
+    required this.tick,
     this.tooltip = '',
   });
   final IconData icon;
@@ -281,13 +314,23 @@ class _FormatBtn extends StatelessWidget {
     try {
       final style = controller.getSelectionStyle();
       final val = style.attributes[attribute.key];
+
+      // Atributos inline booleanos
       if (attribute == Attribute.bold) return val?.value == true;
       if (attribute == Attribute.italic) return val?.value == true;
       if (attribute == Attribute.underline) return val?.value == true;
       if (attribute == Attribute.strikeThrough) return val?.value == true;
+
+      // Checkbox (bloque con key='list', value='unchecked'/'checked')
       if (attribute == Attribute.unchecked || attribute == Attribute.checked) {
         return val != null;
       }
+
+      // Listas: Attribute.ul.key == 'list', value == 'bullet'
+      //         Attribute.ol.key == 'list', value == 'ordered'
+      if (attribute == Attribute.ul) return val?.value == 'bullet';
+      if (attribute == Attribute.ol) return val?.value == 'ordered';
+
       return false;
     } catch (_) {
       return false;
@@ -304,7 +347,6 @@ class _FormatBtn extends StatelessWidget {
       child: InkWell(
         onTap: () {
           if (active) {
-            // Quitar el formato
             controller.formatSelection(Attribute.clone(attribute, null));
           } else {
             controller.formatSelection(attribute);
@@ -333,7 +375,7 @@ class _FormatBtn extends StatelessWidget {
   }
 }
 
-// ─── Botón de acción (deshacer/rehacer) con estado enabled ───────────────────
+// ─── Botón de acción (deshacer/rehacer) ──────────────────────────────────────
 
 class _ActionBtn extends StatelessWidget {
   const _ActionBtn({
@@ -370,12 +412,13 @@ class _ActionBtn extends StatelessWidget {
   }
 }
 
-class _Divider extends StatelessWidget {
+class _ToolbarDivider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
       width: 0.5,
       height: 20,
+      margin: const EdgeInsets.symmetric(horizontal: 2),
       color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.5),
     );
   }
@@ -389,8 +432,13 @@ class _ColorBtn extends StatelessWidget {
   final bool isBackground;
 
   static const _colors = [
-    Colors.red, Colors.orange, Colors.yellow,
-    Colors.green, Colors.blue, Colors.purple, Colors.pink,
+    Colors.red,
+    Colors.orange,
+    Colors.yellow,
+    Colors.green,
+    Colors.blue,
+    Colors.purple,
+    Colors.pink,
   ];
 
   @override
@@ -432,8 +480,8 @@ class _ColorBtn extends StatelessWidget {
                 GestureDetector(
                   onTap: () {
                     isBackground
-                        ? controller.formatSelection(
-                        const BackgroundAttribute(null))
+                        ? controller
+                        .formatSelection(const BackgroundAttribute(null))
                         : controller
                         .formatSelection(const ColorAttribute(null));
                     Navigator.pop(context);
@@ -462,15 +510,14 @@ class _ColorBtn extends StatelessWidget {
                     isBackground
                         ? controller
                         .formatSelection(BackgroundAttribute(hex))
-                        : controller
-                        .formatSelection(ColorAttribute(hex));
+                        : controller.formatSelection(ColorAttribute(hex));
                     Navigator.pop(context);
                   },
                   child: Container(
                     width: 36,
                     height: 36,
-                    decoration: BoxDecoration(
-                        color: c, shape: BoxShape.circle),
+                    decoration:
+                    BoxDecoration(color: c, shape: BoxShape.circle),
                   ),
                 )),
               ],

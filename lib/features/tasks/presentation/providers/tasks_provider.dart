@@ -46,16 +46,15 @@ class TaskActionsNotifier extends Notifier<AsyncValue<void>> {
   Future<void> updateTask(Task task) => _repo.updateTask(task);
 
   /// Completa/descompleta una tarea.
-  /// Si la tarea fue una subtarea promovida, sincroniza el estado
-  /// en la subtarea original del padre.
+  /// Si fue una subtarea promovida, sincroniza el estado en el padre.
   Future<void> toggleDone(String taskId, {required bool isDone}) async {
     await _repo.toggleDone(taskId, isDone: isDone);
-    // Sincronizar con la subtarea padre si aplica
     await _repo.syncPromotedSubtaskDone(taskId, isDone: isDone);
   }
 
   Future<void> deleteTask(String taskId) => _repo.deleteTask(taskId);
 
+  /// Mueve la tarea al tablero destino (posición 0 / cima).
   Future<void> moveToBoard(String taskId, String targetBoardId) =>
       _repo.moveToBoard(taskId, targetBoardId);
 
@@ -75,8 +74,7 @@ class TaskActionsNotifier extends Notifier<AsyncValue<void>> {
       _repo.createSubtask(
           id: const Uuid().v4(), taskId: taskId, title: title.trim());
 
-  Future<void> toggleSubtaskDone(String subtaskId,
-      {required bool isDone}) =>
+  Future<void> toggleSubtaskDone(String subtaskId, {required bool isDone}) =>
       _repo.toggleSubtaskDone(subtaskId, isDone: isDone);
 
   Future<void> deleteSubtask(String subtaskId) =>
@@ -96,11 +94,9 @@ class TaskActionsNotifier extends Notifier<AsyncValue<void>> {
         targetBoardId: targetBoardId,
       );
 
-  /// Programa una tarea para moverse a "Hoy" en una fecha concreta.
   Future<void> scheduleTask(String taskId, DateTime date) =>
       _repo.scheduleTask(taskId, date);
 
-  /// Cancela la programación de una tarea.
   Future<void> cancelSchedule(String taskId) => _repo.cancelSchedule(taskId);
 }
 

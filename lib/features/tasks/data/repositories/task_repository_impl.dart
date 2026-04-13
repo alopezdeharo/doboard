@@ -24,6 +24,11 @@ class TaskRepositoryImpl implements ITaskRepository {
       .map((rows) => rows.map((r) => r.toTask()).toList());
 
   @override
+  Stream<Task?> watchTaskById(String id) => _db.tasksDao
+      .watchTaskById(id)
+      .map((row) => row?.toTask());
+
+  @override
   Future<Task?> getTaskById(String id) async {
     final data = await _db.tasksDao.getTaskById(id);
     return data?.toTask();

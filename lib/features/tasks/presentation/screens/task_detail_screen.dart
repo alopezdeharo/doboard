@@ -6,18 +6,21 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/providers/repository_providers.dart';
+import '../../../../core/utils/automation_engine.dart';
 import '../../../../features/settings/domain/entities/app_settings.dart';
+import '../../../../features/notes/domain/entities/note.dart';
+import '../../../../features/notes/presentation/providers/note_provider.dart';
 import '../../domain/entities/task.dart';
 import '../../domain/entities/priority.dart';
 import '../../domain/entities/subtask.dart';
 import '../providers/tasks_provider.dart';
 
-// autoDispose garantiza que al cerrar la pantalla el provider se descarta,
-// y al reabrirla siempre obtiene datos frescos de la DB.
-// No hace falta invalidar manualmente desde useEffect.
+// StreamProvider reactivo: se actualiza automáticamente cuando Drift emite
+// un cambio, sin necesidad de invalidar manualmente. Elimina el parpadeo
+// de loading que causaba el FutureProvider.autoDispose anterior.
 final taskByIdProvider =
-FutureProvider.autoDispose.family<Task?, String>((ref, taskId) {
-  return ref.read(taskRepositoryProvider).getTaskById(taskId);
+StreamProvider.autoDispose.family<Task?, String>((ref, taskId) {
+  return ref.watch(taskRepositoryProvider).watchTaskById(taskId);
 });
 
 class TaskDetailScreen extends ConsumerWidget {
@@ -58,6 +61,18 @@ class _TaskDetailView extends HookConsumerWidget {
     final selectedPriority = useState(task.priority);
     final actions = ref.read(taskActionsProvider.notifier);
 
+    // Sincroniza selectedPriority cuando el stream emite un task actualizado.
+    // Sin esto, el selector de prioridad no refleja cambios hasta que
+    // el usuario interactúa con otro elemento.
+    useEffect(() {
+      selectedPriority.value = task.priority;
+      return null;
+    }, [task.priority]);
+
+    // Nota reactiva: watch directo en lugar de task.hasNote (sin JOIN en stream)
+    final noteAsync = ref.watch(noteByTaskProvider(task.id));
+    final note = noteAsync.valueOrNull;
+
     final frogEnabled = ref.watch(settingsProvider).maybeWhen(
       data: (s) => s.frogEnabled,
       orElse: () => true,
@@ -67,7 +82,12 @@ class _TaskDetailView extends HookConsumerWidget {
     void saveTitle() {
       final v = titleCtrl.text.trim();
       if (v.isNotEmpty && v != task.title) {
-        actions.updateTask(task.copyWith(title: v));
+        // Detectar palabras clave al editar el título
+        final keyword = AutomationEngine.instance.detect(v);
+        actions.updateTask(task.copyWith(
+          title: v,
+          detectedKeyword: keyword,
+        ));
       }
       isEditingTitle.value = false;
     }
@@ -76,18 +96,14 @@ class _TaskDetailView extends HookConsumerWidget {
       final v = contentCtrl.text.trim();
       actions.updateTask(task.copyWith(content: v.isEmpty ? null : v));
       isEditingContent.value = false;
-      // Refrescar la vista invalidando el provider tras guardar
-      ref.invalidate(taskByIdProvider(task.id));
     }
 
     void setPriority(Priority p) {
       selectedPriority.value = p;
       actions.updateTask(task.copyWith(priority: p));
-      ref.invalidate(taskByIdProvider(task.id));
     }
 
     return PopScope(
-      // Interceptar el gesto de volver para guardar la descripción pendiente
       onPopInvokedWithResult: (didPop, _) {
         if (isEditingContent.value) {
           final v = contentCtrl.text.trim();
@@ -96,7 +112,8 @@ class _TaskDetailView extends HookConsumerWidget {
         if (isEditingTitle.value) {
           final v = titleCtrl.text.trim();
           if (v.isNotEmpty && v != task.title) {
-            actions.updateTask(task.copyWith(title: v));
+            final keyword = AutomationEngine.instance.detect(v);
+            actions.updateTask(task.copyWith(title: v, detectedKeyword: keyword));
           }
         }
       },
@@ -202,7 +219,7 @@ class _TaskDetailView extends HookConsumerWidget {
 
                         // ── Nota ──────────────────────────────────────
                         _NoteShortcut(
-                            taskId: task.id, hasNote: task.hasNote),
+                            taskId: task.id, note: note),
                         const SizedBox(height: 24),
 
                         // ── Subtareas ──────────────────────────────────
@@ -367,13 +384,16 @@ class _PrioritySelector extends StatelessWidget {
 // ─── Acceso a nota ────────────────────────────────────────────────────────────
 
 class _NoteShortcut extends StatelessWidget {
-  const _NoteShortcut({required this.taskId, required this.hasNote});
+  const _NoteShortcut({required this.taskId, required this.note});
   final String taskId;
-  final bool hasNote;
+  final Note? note;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final hasNote = note != null && !note!.isEmpty;
+    final preview = hasNote ? note!.plainText.trim() : null;
+
     return GestureDetector(
       onTap: () => context.push('/task/$taskId/note'),
       child: Container(
@@ -390,26 +410,57 @@ class _NoteShortcut extends StatelessWidget {
             width: 0.5,
           ),
         ),
-        child: Row(children: [
-          Icon(
-            hasNote
-                ? Icons.sticky_note_2_rounded
-                : Icons.add_comment_outlined,
-            size: 18,
-            color: hasNote
-                ? theme.colorScheme.secondary
-                : theme.colorScheme.onSurface.withOpacity(0.4),
-          ),
-          const SizedBox(width: 10),
-          Text(
-            hasNote ? 'Ver nota completa →' : 'Añadir nota extensa...',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: hasNote
-                  ? theme.colorScheme.secondary
-                  : theme.colorScheme.onSurface.withOpacity(0.4),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 1),
+              child: Icon(
+                hasNote
+                    ? Icons.sticky_note_2_rounded
+                    : Icons.add_comment_outlined,
+                size: 18,
+                color: hasNote
+                    ? theme.colorScheme.secondary
+                    : theme.colorScheme.onSurface.withOpacity(0.4),
+              ),
             ),
-          ),
-        ]),
+            const SizedBox(width: 10),
+            Expanded(
+              child: hasNote && preview != null && preview.isNotEmpty
+                  ? Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Preview del contenido de la nota
+                  Text(
+                    preview,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurface.withOpacity(0.65),
+                      height: 1.4,
+                    ),
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Ver nota completa →',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.secondary.withOpacity(0.7),
+                    ),
+                  ),
+                ],
+              )
+                  : Text(
+                hasNote ? 'Ver nota completa →' : 'Añadir nota extensa...',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: hasNote
+                      ? theme.colorScheme.secondary
+                      : theme.colorScheme.onSurface.withOpacity(0.4),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -439,6 +490,17 @@ class _SubtaskSection extends HookConsumerWidget {
       await actions.createSubtask(taskId: task.id, title: title);
       inputCtrl.clear();
     }
+
+    // Guardar subtarea pendiente cuando el usuario vuelve atrás con el
+    // botón de sistema (que no dispara onTapOutside ni onSubmitted).
+    useEffect(() {
+      return () {
+        final title = inputCtrl.text.trim();
+        if (isAdding.value && title.isNotEmpty) {
+          actions.createSubtask(taskId: task.id, title: title);
+        }
+      };
+    }, []);
 
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       // Cabecera colapsable

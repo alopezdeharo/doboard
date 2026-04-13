@@ -15,7 +15,9 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
       ..orderBy([
             (t) => OrderingTerm.desc(t.isPinned),
             (t) => OrderingTerm.desc(t.isFrog),
-            (t) => OrderingTerm.desc(t.priority),
+        // priority NO está en el ORDER BY: la prioridad se comunica
+        // visualmente con la barra de color lateral. El orden manual
+        // del usuario (position) tiene prioridad absoluta.
             (t) => OrderingTerm.asc(t.position),
       ]))
         .watch();
@@ -27,7 +29,6 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
       ..orderBy([
             (t) => OrderingTerm.desc(t.isPinned),
             (t) => OrderingTerm.desc(t.isFrog),
-            (t) => OrderingTerm.desc(t.priority),
             (t) => OrderingTerm.asc(t.position),
       ]))
         .watch();
@@ -35,6 +36,12 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
 
   Future<TaskData?> getTaskById(String id) {
     return (select(tasks)..where((t) => t.id.equals(id))).getSingleOrNull();
+  }
+
+  /// Stream reactivo de una tarea por ID.
+  /// Emite null si la tarea fue eliminada.
+  Stream<TaskData?> watchTaskById(String id) {
+    return (select(tasks)..where((t) => t.id.equals(id))).watchSingleOrNull();
   }
 
   Future<int> countPendingByBoard(String boardId) async {

@@ -9,6 +9,7 @@ import '../../domain/entities/priority.dart';
 import '../../domain/entities/subtask.dart';
 import '../providers/tasks_provider.dart';
 import '../../../../features/settings/domain/entities/app_settings.dart';
+import '../../../../features/notes/presentation/providers/note_provider.dart';
 import 'task_context_menu.dart';
 
 class TaskCard extends ConsumerStatefulWidget {
@@ -142,6 +143,11 @@ class _CardBody extends ConsumerWidget {
     final subtasksAsync = ref.watch(subtasksByTaskProvider(task.id));
     final subtasks = subtasksAsync.valueOrNull ?? [];
 
+    // hasNote reactivo: observa la nota directamente en lugar de usar
+    // task.hasNote, que nunca se popula desde watchTasksByBoard (sin JOIN).
+    final noteAsync = ref.watch(noteByTaskProvider(task.id));
+    final hasNote = noteAsync.valueOrNull != null;
+
     final frogEnabled = ref.watch(settingsProvider).maybeWhen(
       data: (s) => s.frogEnabled,
       orElse: () => true,
@@ -257,9 +263,9 @@ class _CardBody extends ConsumerWidget {
                         _SubtaskPreview(subtasks: subtasks),
                       ],
 
-                      if (!isDone && task.hasNote) ...[
-                        const SizedBox(height: 5),
-                        _Badge(icon: Icons.notes_rounded, label: 'nota'),
+                      if (!isDone && hasNote) ...[
+                        const SizedBox(height: 4),
+                        const Text('📝', style: TextStyle(fontSize: 12)),
                       ],
                       if (!isDone && task.isScheduled) ...[
                         const SizedBox(height: 5),

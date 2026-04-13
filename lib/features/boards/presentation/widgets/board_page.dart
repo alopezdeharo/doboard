@@ -70,14 +70,19 @@ class _TaskListState extends ConsumerState<_TaskList> {
   @override
   void didUpdateWidget(_TaskList old) {
     super.didUpdateWidget(old);
-    // Sincroniza desde el stream SOLO si el conjunto de IDs cambia
-    // (tarea creada, eliminada o movida a otro tablero).
-    // Si solo cambió el orden (reorder propio), el stream refleja
-    // lo que ya tenemos en _tasks — ignoramos esa actualización.
     final oldIds = _tasks.map((t) => t.id).toSet();
     final newIds = widget.tasks.map((t) => t.id).toSet();
+
     if (!setEquals(oldIds, newIds)) {
+      // El conjunto de IDs cambió (tarea creada, eliminada o movida
+      // a otro tablero): sincronización completa desde el stream.
       setState(() => _tasks = List.from(widget.tasks));
+    } else {
+      // Mismos IDs pero datos actualizados (prioridad, contenido, isDone…):
+      // preservar el orden manual del usuario y actualizar solo los datos.
+      final newById = {for (final t in widget.tasks) t.id: t};
+      final merged = _tasks.map((t) => newById[t.id] ?? t).toList();
+      setState(() => _tasks = merged);
     }
   }
 
@@ -116,8 +121,12 @@ class _TaskListState extends ConsumerState<_TaskList> {
       itemCount: _tasks.length,
       itemBuilder: (context, index) {
         final task = _tasks[index];
+        // La key incluye campos que cambian visualmente (prioridad, título,
+        // isDone) para que ReorderableListView reconstruya la tarjeta cuando
+        // sus datos cambian — sin esto, las tarjetas no se actualizan aunque
+        // _tasks tenga datos nuevos porque la key (solo id) no varía.
         return TaskCardDraggable(
-          key: ValueKey(task.id),
+          key: ValueKey('${task.id}_${task.priority.value}_${task.isDone}_${task.title.hashCode}'),
           task: task,
           boardId: widget.board.id,
           index: index,

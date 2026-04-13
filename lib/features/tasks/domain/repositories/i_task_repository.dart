@@ -5,6 +5,7 @@ import '../entities/priority.dart';
 abstract interface class ITaskRepository {
   Stream<List<Task>> watchTasksByBoard(String boardId);
   Stream<List<Task>> watchPendingTasksByBoard(String boardId);
+  Stream<Task?> watchTaskById(String id);
   Future<Task?> getTaskById(String id);
 
   Future<void> createTask({

@@ -8,6 +8,10 @@ abstract interface class ITaskRepository {
   Stream<Task?> watchTaskById(String id);
   Future<Task?> getTaskById(String id);
 
+  /// Stream de todas las tareas programadas pendientes (scheduledDate != null),
+  /// ordenadas por fecha. Alimenta la pestaña Próximo.
+  Stream<List<Task>> watchScheduledTasks();
+
   Future<void> createTask({
     required String id,
     required String boardId,

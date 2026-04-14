@@ -17,6 +17,12 @@ StreamProvider.family<List<Subtask>, String>((ref, taskId) {
   return ref.watch(taskRepositoryProvider).watchSubtasksByTask(taskId);
 });
 
+/// Stream de todas las tareas programadas pendientes.
+/// Alimenta la pestaña Próximo del MainShell.
+final scheduledTasksProvider = StreamProvider<List<Task>>((ref) {
+  return ref.watch(taskRepositoryProvider).watchScheduledTasks();
+});
+
 final dragStateProvider = StateProvider<Task?>((ref) => null);
 
 class TaskActionsNotifier extends Notifier<AsyncValue<void>> {

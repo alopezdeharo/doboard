@@ -34,6 +34,16 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
         .watch();
   }
 
+  /// Stream de todas las tareas programadas pendientes, ordenadas por fecha.
+  /// Alimenta la pestaña Próximo del MainShell.
+  Stream<List<TaskData>> watchScheduledTasks() {
+    return (select(tasks)
+      ..where((t) =>
+      t.scheduledDate.isNotNull() & t.isDone.equals(false))
+      ..orderBy([(t) => OrderingTerm.asc(t.scheduledDate)]))
+        .watch();
+  }
+
   Future<TaskData?> getTaskById(String id) {
     return (select(tasks)..where((t) => t.id.equals(id))).getSingleOrNull();
   }

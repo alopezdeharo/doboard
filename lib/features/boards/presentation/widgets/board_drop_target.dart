@@ -7,16 +7,19 @@ import '../../../tasks/domain/entities/task.dart';
 import '../../../tasks/presentation/providers/tasks_provider.dart';
 
 /// Overlay que aparece en la parte inferior cuando el usuario arrastra
-/// una tarjeta. Muestra los 4 tableros como destinos de drop.
+/// una tarjeta. Muestra los tableros como destinos de drop.
+///
+/// Usa [currentBoardId] (string) en lugar de un índice numérico para evitar
+/// confusiones entre el índice de work boards y el de visibleBoards.
 class BoardDropTargets extends ConsumerWidget {
   const BoardDropTargets({
     super.key,
     required this.boards,
-    required this.currentBoardIndex,
+    required this.currentBoardId,
   });
 
   final List<Board> boards;
-  final int currentBoardIndex;
+  final String currentBoardId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -37,36 +40,35 @@ class BoardDropTargets extends ConsumerWidget {
         ),
         padding: const EdgeInsets.fromLTRB(12, 32, 12, 16),
         child: Row(
-          children: List.generate(boards.length, (i) {
-            final isCurrentBoard = i == currentBoardIndex;
+          children: boards.map((board) {
+            final isCurrent = board.id == currentBoardId;
             return Expanded(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: isCurrentBoard
+                child: isCurrent
                     ? _CancelTarget(
                   onCancel: () =>
                   ref.read(dragStateProvider.notifier).state = null,
                 )
                     : _BoardTarget(
-                  board: boards[i],
+                  board: board,
                   onDrop: (task) {
                     HapticFeedback.mediumImpact();
                     ref
                         .read(taskActionsProvider.notifier)
-                        .moveToBoard(task.id, boards[i].id);
+                        .moveToBoard(task.id, board.id);
                     ref.read(dragStateProvider.notifier).state = null;
                   },
                 ),
               ),
             );
-          }),
+          }).toList(),
         ),
       ),
     );
   }
 }
 
-/// Target de un tablero destino.
 class _BoardTarget extends StatefulWidget {
   const _BoardTarget({required this.board, required this.onDrop});
   final Board board;
@@ -90,9 +92,9 @@ class _BoardTargetState extends State<_BoardTarget> {
       onLeave: (_) => setState(() => _isHovered = false),
       onAcceptWithDetails: (details) {
         setState(() => _isHovered = false);
-        widget.onDrop(details.data); // fire-and-forget: el picker es modal
+        widget.onDrop(details.data);
       },
-      builder: (_, candidateData, __) {
+      builder: (_, __, ___) {
         return AnimatedContainer(
           duration: const Duration(milliseconds: 150),
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
@@ -131,8 +133,6 @@ class _BoardTargetState extends State<_BoardTarget> {
     );
   }
 }
-
-// ─── Target para cancelar el drag ─────────────────────────────────────────────
 
 class _CancelTarget extends StatelessWidget {
   const _CancelTarget({required this.onCancel});

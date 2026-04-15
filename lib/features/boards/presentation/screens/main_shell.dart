@@ -5,7 +5,6 @@ import '../../../../features/settings/domain/entities/app_settings.dart';
 import 'hoy_screen.dart';
 import 'work_boards_screen.dart';
 import '../../../boards/presentation/screens/scheduled_tasks_screen.dart';
-
 import '../providers/boards_provider.dart';
 
 /// Shell principal de la app.
@@ -69,7 +68,7 @@ class _MainShellState extends ConsumerState<MainShell> {
             NavigationDestination(
               icon: Icon(Icons.view_week_outlined),
               selectedIcon: Icon(Icons.view_week_rounded),
-              label: 'Tableros',
+              label: 'Tareas',
             ),
             NavigationDestination(
               icon: Icon(Icons.event_note_outlined),

@@ -82,7 +82,7 @@ class BoardsDao extends DatabaseAccessor<AppDatabase> with _$BoardsDaoMixin {
       ),
       (
       id: 'board-rapidas',
-      name: 'Rápidas',
+      name: 'Tareas rápidas',
       subtitle: 'Menos de 10 minutos',
       emoji: '⚡',
       color: '#185FA5',
@@ -90,18 +90,18 @@ class BoardsDao extends DatabaseAccessor<AppDatabase> with _$BoardsDaoMixin {
       ),
       (
       id: 'board-calma',
-      name: 'Con calma',
-      subtitle: '30 a 60 minutos',
-      emoji: '🧘',
+      name: 'Tareas medias',
+      subtitle: '10 a 30 minutos',
+      emoji: '⏳',
       color: '#BA7517',
       pos: 2,
       ),
       (
       id: 'board-prisa',
-      name: 'Sin prisa',
-      subtitle: 'Más de una hora',
-      emoji: '🌿',
-      color: '#533AB7', // c-purple 600
+      name: 'Tareas largas',
+      subtitle: 'Más de 30 minutos',
+      emoji: '🕒',
+      color: '#533AB7',
       pos: 3,
       ),
     ];

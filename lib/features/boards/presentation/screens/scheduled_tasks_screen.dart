@@ -312,10 +312,10 @@ class _BoardBadge extends ConsumerWidget {
   final String boardId;
 
   static const _boardNames = {
-    'board-hoy': ('Hoy', '🐸'),
+    'board-hoy':     ('Hoy',     '🐸'),
     'board-rapidas': ('Rápidas', '⚡'),
-    'board-calma': ('Con calma', '🧘'),
-    'board-prisa': ('Sin prisa', '🌿'),
+    'board-calma':   ('Medias',  '⏳'),
+    'board-prisa':   ('Largas',  '🕒'),
   };
 
   @override

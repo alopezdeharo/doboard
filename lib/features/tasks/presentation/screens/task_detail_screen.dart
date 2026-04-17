@@ -18,10 +18,10 @@ import '../providers/tasks_provider.dart';
 // StreamProvider reactivo: se actualiza automáticamente cuando Drift emite
 // un cambio, sin necesidad de invalidar manualmente. Elimina el parpadeo
 // de loading que causaba el FutureProvider.autoDispose anterior.
-final taskByIdProvider =
+/*final taskByIdProvider =
 StreamProvider.autoDispose.family<Task?, String>((ref, taskId) {
   return ref.watch(taskRepositoryProvider).watchTaskById(taskId);
-});
+});*/
 
 class TaskDetailScreen extends ConsumerWidget {
   const TaskDetailScreen({super.key, required this.taskId});

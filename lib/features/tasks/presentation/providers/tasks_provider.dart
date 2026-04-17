@@ -109,3 +109,10 @@ class TaskActionsNotifier extends Notifier<AsyncValue<void>> {
 final taskActionsProvider =
 NotifierProvider<TaskActionsNotifier, AsyncValue<void>>(
     TaskActionsNotifier.new);
+
+/// Stream reactivo de una tarea por ID.
+/// Emite null si la tarea fue eliminada.
+final taskByIdProvider =
+StreamProvider.autoDispose.family<Task?, String>((ref, taskId) {
+  return ref.watch(taskRepositoryProvider).watchTaskById(taskId);
+});

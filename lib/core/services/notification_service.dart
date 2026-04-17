@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
+import '../../core/router/app_router.dart';
 
 /// Servicio singleton que encapsula flutter_local_notifications.
 ///
@@ -197,8 +198,8 @@ class NotificationService {
   /// cuando se integre con go_router desde un punto global.
   void _onNotificationTap(NotificationResponse response) {
     final taskId = response.payload;
+    if (taskId == null || taskId.isEmpty) return;
     debugPrint('[Notif] Tapped → taskId=$taskId');
-    // TODO: navegar a /task/$taskId usando el router global
-    // NavigationService.instance.push('/task/$taskId');
+    appRouter.push('/task/$taskId');
   }
 }

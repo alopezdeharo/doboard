@@ -6,7 +6,6 @@ import '../../../../core/providers/repository_providers.dart';
 import '../../../../core/utils/automation_engine.dart';
 import '../../../../features/boards/domain/entities/board.dart';
 import '../../../../features/boards/presentation/providers/boards_provider.dart';
-import '../../../../core/providers/repository_providers.dart';
 import '../../domain/entities/app_settings.dart';
 
 class SettingsScreen extends ConsumerWidget {

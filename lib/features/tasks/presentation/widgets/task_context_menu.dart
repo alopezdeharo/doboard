@@ -110,7 +110,7 @@ class TaskContextMenu extends ConsumerWidget {
               if (task.isScheduled) {
                 actions.cancelSchedule(task.id);
               } else {
-                await _showDatePicker(context, ref, task);
+                await _showDatePicker(context, actions, task);
               }
             },
           ),
@@ -193,7 +193,7 @@ class TaskContextMenu extends ConsumerWidget {
   }
 
   Future<void> _showDatePicker(
-      BuildContext context, WidgetRef ref, Task task) async {
+      BuildContext context, TaskActionsNotifier actions, Task task) async {
     final now = DateTime.now();
     final picked = await showDatePicker(
       context: context,
@@ -209,8 +209,12 @@ class TaskContextMenu extends ConsumerWidget {
       // Solicitar permiso de notificación la primera vez que el usuario
       // programa una tarea. El sistema solo muestra el diálogo una vez;
       // las siguientes llamadas devuelven el resultado ya guardado.
-      await NotificationService.instance.requestPermission();
-      ref.read(taskActionsProvider.notifier).scheduleTask(task.id, scheduled);
+      try {
+        await NotificationService.instance.requestPermission();
+      } catch (_) {
+        // La programación de la tarea no debe depender del permiso.
+      }
+      await actions.scheduleTask(task.id, scheduled);
     }
   }
 }

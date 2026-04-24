@@ -139,20 +139,27 @@ class TaskRepositoryImpl implements ITaskRepository {
 
   @override
   Future<void> scheduleTask(String taskId, DateTime date) async {
+    final normalizedDate = DateTime(date.year, date.month, date.day);
     await (_db.update(_db.tasks)..where((t) => t.id.equals(taskId))).write(
       TasksCompanion(
-        scheduledDate: Value(date.millisecondsSinceEpoch),
+        scheduledDate: Value(normalizedDate.millisecondsSinceEpoch),
+        isDone: const Value(false),
+        completedAt: const Value(null),
         updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
       ),
     );
     // Obtener título para el texto de la notificación
     final task = await _db.tasksDao.getTaskById(taskId);
     if (task != null) {
-      await NotificationService.instance.scheduleTaskNotification(
-        taskId: taskId,
-        taskTitle: task.title,
-        scheduledDate: date,
-      );
+      try {
+        await NotificationService.instance.scheduleTaskNotification(
+          taskId: taskId,
+          taskTitle: task.title,
+          scheduledDate: normalizedDate,
+        );
+      } catch (_) {
+        // La tarea ya quedó programada en DB; ignorar fallo de notificación.
+      }
     }
   }
 

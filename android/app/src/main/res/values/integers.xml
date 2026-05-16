@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Ancho del diálogo «Nueva tarea» (% de la pantalla). Ej.: 92 = 92 % -->
+    <integer name="widget_dialog_width_percent">80</integer>
+</resources>

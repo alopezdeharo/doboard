@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="widget_surface">#F5F5F7</color>
+    <color name="widget_on_surface">#1C1C1E</color>
+    <color name="widget_on_surface_muted">#6B6B70</color>
+    <color name="widget_primary">#1D9E75</color>
+    <color name="widget_chip_rapidas">#185FA5</color>
+    <color name="widget_chip_medias">#BA7517</color>
+    <color name="widget_chip_largas">#533AB7</color>
+    <color name="widget_chip_unselected_bg">#E8E8ED</color>
+    <color name="widget_chip_unselected_text">#3A3A3C</color>
+</resources>

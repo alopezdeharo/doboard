@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/widget_surface_bg"
+    android:orientation="vertical"
+    android:padding="20dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/widget_dialog_title"
+        android:textColor="@color/widget_on_surface"
+        android:textSize="17sp"
+        android:textStyle="bold" />
+
+    <EditText
+        android:id="@+id/dialog_input"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="14dp"
+        android:background="@drawable/widget_input_bg"
+        android:hint="@string/widget_add_task_hint"
+        android:imeOptions="actionDone"
+        android:inputType="textCapSentences"
+        android:maxLines="4"
+        android:minHeight="48dp"
+        android:padding="14dp"
+        android:textColor="@color/widget_on_surface"
+        android:textColorHint="@color/widget_on_surface_muted"
+        android:textSize="16sp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="14dp"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/dialog_chip_rapidas"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="4dp"
+            android:layout_weight="1"
+            android:background="@drawable/widget_chip_unselected"
+            android:gravity="center"
+            android:paddingStart="6dp"
+            android:paddingTop="10dp"
+            android:paddingEnd="6dp"
+            android:paddingBottom="10dp"
+            android:maxLines="1"
+            android:text="@string/widget_chip_rapidas"
+            android:textColor="@color/widget_chip_unselected_text"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/dialog_chip_medias"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:layout_marginEnd="4dp"
+            android:layout_weight="1"
+            android:background="@drawable/widget_chip_unselected"
+            android:gravity="center"
+            android:paddingStart="6dp"
+            android:paddingTop="10dp"
+            android:paddingEnd="6dp"
+            android:paddingBottom="10dp"
+            android:maxLines="1"
+            android:text="@string/widget_chip_medias"
+            android:textColor="@color/widget_chip_unselected_text"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/dialog_chip_largas"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:layout_weight="1"
+            android:background="@drawable/widget_chip_unselected"
+            android:gravity="center"
+            android:paddingStart="6dp"
+            android:paddingTop="10dp"
+            android:paddingEnd="6dp"
+            android:paddingBottom="10dp"
+            android:maxLines="1"
+            android:text="@string/widget_chip_largas"
+            android:textColor="@color/widget_chip_unselected_text"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/dialog_btn_submit"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:background="@drawable/widget_submit_btn_bg"
+        android:gravity="center"
+        android:minHeight="48dp"
+        android:padding="12dp"
+        android:text="@string/widget_add_button"
+        android:textColor="@android:color/white"
+        android:textSize="15sp"
+        android:textStyle="bold" />
+</LinearLayout>

@@ -125,6 +125,9 @@ dependencies:
   # Exportar / importar backup JSON de tareas en el dispositivo
   file_picker: ^8.1.6
 
+  # Widget de escritorio Android (añadir tarea + chips)
+  home_widget: ^0.9.1
+
   # ─────────────────────────────────────────
   # FUTURO: SINCRONIZACIÓN EN NUBE
   # (Comentado — descomentar cuando se implemente Firebase)

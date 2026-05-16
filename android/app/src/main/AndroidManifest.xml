@@ -28,6 +28,16 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".AddTaskWidgetActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:label=""
+            android:launchMode="singleTop"
+            android:taskAffinity=""
+            android:theme="@style/WidgetAddTaskDialogTheme"
+            android:windowSoftInputMode="adjustPan|stateVisible" />
+
         <meta-data
             android:name="flutterEmbedding"
             android:value="2"/>
@@ -45,6 +55,27 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED"/>
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
             </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name="es.antonborri.home_widget.HomeWidgetBackgroundReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="es.antonborri.home_widget.action.BACKGROUND" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name=".AddTaskWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_add_task_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.adrisdev.doboard.WIDGET_SELECT_BOARD" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_add_task_info" />
         </receiver>
 
     </application>

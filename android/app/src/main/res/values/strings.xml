@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_add_task_label">Añadir tarea</string>
+    <string name="widget_add_task_description">Escribe una tarea y elige rápida, media o larga</string>
+    <string name="widget_add_task_hint">Nueva tarea…</string>
+    <string name="widget_chip_rapidas">Rápida</string>
+    <string name="widget_chip_medias">Media</string>
+    <string name="widget_chip_largas">Larga</string>
+    <string name="widget_add_button">Añadir</string>
+    <string name="widget_dialog_title">Nueva tarea</string>
+</resources>

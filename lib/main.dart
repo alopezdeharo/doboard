@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:home_widget/home_widget.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
 import 'app.dart';
 import 'core/providers/repository_providers.dart';
 import 'core/services/notification_service.dart';
+import 'widgets/home/add_task_widget_callback.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  HomeWidget.registerInteractivityCallback(addTaskWidgetCallback);
 
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 

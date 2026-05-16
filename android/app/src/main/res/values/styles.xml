@@ -15,4 +15,21 @@
     <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
         <item name="android:windowBackground">?android:colorBackground</item>
     </style>
+
+    <!-- Diálogo flotante centrado; el ancho se fija en código para Samsung One UI -->
+    <style name="WidgetAddTaskDialogTheme" parent="@android:style/Theme.Material.Dialog.NoActionBar">
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowIsFloating">true</item>
+        <item name="android:windowCloseOnTouchOutside">true</item>
+        <item name="android:backgroundDimEnabled">true</item>
+        <item name="android:windowMinWidthMajor">92%</item>
+        <item name="android:windowMinWidthMinor">92%</item>
+        <item name="android:windowAnimationStyle">@style/WidgetAddTaskDialogAnimation</item>
+    </style>
+
+    <style name="WidgetAddTaskDialogAnimation">
+        <item name="android:windowEnterAnimation">@anim/widget_dialog_fade_in</item>
+        <item name="android:windowExitAnimation">@anim/widget_dialog_fade_out</item>
+    </style>
 </resources>

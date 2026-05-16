@@ -4,144 +4,66 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../features/settings/domain/entities/app_settings.dart';
 import '../../domain/entities/board.dart';
-import '../providers/boards_provider.dart';
 import '../widgets/board_page.dart';
 import '../widgets/board_nav_dots.dart';
-import '../widgets/board_drop_target.dart';
 import '../../../tasks/presentation/providers/tasks_provider.dart';
 import '../../../tasks/presentation/widgets/quick_input_bar.dart';
 
-/// Pestaña "Tableros" del MainShell.
-/// PageView horizontal con los tableros de trabajo (todos excepto Hoy).
-class WorkBoardsScreen extends ConsumerStatefulWidget {
-  const WorkBoardsScreen({super.key});
+/// Una página del flujo principal: un tablero de trabajo (cabecera, dots,
+/// lista). El deslizamiento entre tableros lo gestiona [MainShell].
+class WorkBoardPageScaffold extends ConsumerWidget {
+  const WorkBoardPageScaffold({
+    super.key,
+    required this.workBoards,
+    required this.workBoardIndex,
+    required this.onJumpToWorkBoardIndex,
+  });
+
+  final List<Board> workBoards;
+  final int workBoardIndex;
+  final ValueChanged<int> onJumpToWorkBoardIndex;
 
   @override
-  ConsumerState<WorkBoardsScreen> createState() => _WorkBoardsScreenState();
-}
-
-class _WorkBoardsScreenState extends ConsumerState<WorkBoardsScreen> {
-  late final PageController _pageController;
-
-  @override
-  void initState() {
-    super.initState();
-    final savedIndex = ref.read(workBoardIndexProvider);
-    _pageController = PageController(initialPage: savedIndex);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && _pageController.hasClients) {
-        final current = ref.read(workBoardIndexProvider);
-        if (_pageController.page?.round() != current) {
-          _pageController.jumpToPage(current);
-        }
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _pageController.dispose();
-    super.dispose();
-  }
-
-  void _onPageChanged(int index) {
-    ref.read(workBoardIndexProvider.notifier).state = index;
-  }
-
-  void _jumpToPage(int index) {
-    ref.read(workBoardIndexProvider.notifier).state = index;
-    if (_pageController.hasClients) {
-      _pageController.animateToPage(
-        index,
-        duration: const Duration(milliseconds: 280),
-        curve: Curves.easeOutCubic,
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (workBoards.isEmpty) {
+      return Scaffold(
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        body: const SafeArea(
+          child: Center(child: Text('No hay tableros de trabajo')),
+        ),
       );
     }
-  }
 
-  @override
-  Widget build(BuildContext context) {
-    ref.listen<int>(workBoardIndexProvider, (_, next) {
-      if (_pageController.hasClients &&
-          _pageController.page?.round() != next) {
-        _pageController.jumpToPage(next);
-      }
-    });
-
-    final workBoardsAsync = ref.watch(workBoardsProvider);
-    final visibleBoardsAsync = ref.watch(visibleBoardsProvider);
-    final currentIndex = ref.watch(workBoardIndexProvider);
+    final safeIndex = workBoardIndex.clamp(0, workBoards.length - 1);
+    final currentBoard = workBoards[safeIndex];
     final settingsAsync = ref.watch(settingsProvider);
     final inputPos =
         settingsAsync.valueOrNull?.inputPosition ?? InputPosition.bottom;
-    final isDragging = ref.watch(dragStateProvider) != null;
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
-      body: workBoardsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
-        data: (workBoards) {
-          if (workBoards.isEmpty) {
-            return const Center(child: Text('No hay tableros de trabajo'));
-          }
-
-          final safeIndex = currentIndex.clamp(0, workBoards.length - 1);
-          if (safeIndex != currentIndex) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              ref.read(workBoardIndexProvider.notifier).state = safeIndex;
-            });
-          }
-
-          final currentBoard = workBoards[safeIndex];
-
-          return SafeArea(
-            child: Column(
-              children: [
-                _WorkBoardsHeader(
-                  boards: workBoards,
-                  currentIndex: safeIndex,
-                ),
-                if (inputPos == InputPosition.top)
-                  QuickInputBar(boardId: currentBoard.id),
-                BoardNavDots(
-                  count: workBoards.length,
-                  currentIndex: safeIndex,
-                  onDotTap: _jumpToPage,
-                ),
-                const SizedBox(height: 4),
-                Expanded(
-                  child: Stack(
-                    children: [
-                      PageView.builder(
-                        controller: _pageController,
-                        onPageChanged: _onPageChanged,
-                        itemCount: workBoards.length,
-                        physics: const ClampingScrollPhysics(),
-                        itemBuilder: (context, index) => BoardPage(
-                          board: workBoards[index],
-                          isActive: index == safeIndex,
-                        ),
-                      ),
-                      // Drop targets: usa todos los tableros visibles para
-                      // permitir arrastrar también a Hoy desde aquí.
-                      if (isDragging)
-                        visibleBoardsAsync.maybeWhen(
-                          data: (allBoards) => BoardDropTargets(
-                            boards: allBoards,
-                            currentBoardId: currentBoard.id,
-                          ),
-                          orElse: () => const SizedBox.shrink(),
-                        ),
-                    ],
-                  ),
-                ),
-                if (inputPos == InputPosition.bottom)
-                  QuickInputBar(boardId: currentBoard.id),
-              ],
+      body: SafeArea(
+        child: Column(
+          children: [
+            _WorkBoardsHeader(
+              boards: workBoards,
+              currentIndex: safeIndex,
             ),
-          );
-        },
+            if (inputPos == InputPosition.top)
+              QuickInputBar(boardId: currentBoard.id),
+            BoardNavDots(
+              count: workBoards.length,
+              currentIndex: safeIndex,
+              onDotTap: onJumpToWorkBoardIndex,
+            ),
+            const SizedBox(height: 4),
+            Expanded(
+              child: BoardPage(board: currentBoard, isActive: true),
+            ),
+            if (inputPos == InputPosition.bottom)
+              QuickInputBar(boardId: currentBoard.id),
+          ],
+        ),
       ),
     );
   }
@@ -218,9 +140,10 @@ class _ClearCompletedButton extends ConsumerWidget {
     return TextButton.icon(
       onPressed: () async {
         final confirmed = await showModalBottomSheet<bool>(
-          context: context,
-          builder: (_) => const _ClearConfirmSheet(),
-        ) ?? false;
+              context: context,
+              builder: (_) => const _ClearConfirmSheet(),
+            ) ??
+            false;
         if (confirmed) {
           ref.read(taskActionsProvider.notifier).clearCompleted(boardId);
         }
@@ -250,7 +173,8 @@ class _ClearConfirmSheet extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 36, height: 4,
+            width: 36,
+            height: 4,
             margin: const EdgeInsets.only(bottom: 20),
             decoration: BoxDecoration(
               color: theme.colorScheme.onSurface.withOpacity(0.15),

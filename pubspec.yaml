@@ -122,6 +122,9 @@ dependencies:
   # (posición del input, texto size, tableros visibles, automatizaciones on/off)
   shared_preferences: ^2.3.1
 
+  # Exportar / importar backup JSON de tareas en el dispositivo
+  file_picker: ^8.1.6
+
   # ─────────────────────────────────────────
   # FUTURO: SINCRONIZACIÓN EN NUBE
   # (Comentado — descomentar cuando se implemente Firebase)

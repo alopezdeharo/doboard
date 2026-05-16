@@ -1,11 +1,16 @@
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
 import '../../../../core/providers/repository_providers.dart';
 import '../../../../core/utils/automation_engine.dart';
-import '../../../../features/boards/domain/entities/board.dart';
 import '../../../../features/boards/presentation/providers/boards_provider.dart';
+import '../../../../features/tasks/data/services/task_backup_service.dart';
 import '../../domain/entities/app_settings.dart';
 
 class SettingsScreen extends ConsumerWidget {
@@ -124,6 +129,29 @@ class SettingsScreen extends ConsumerWidget {
                       const SizedBox(height: 8),
                       const _AutomationRulesList(),
                     ],
+                    const SizedBox(height: 8),
+
+                    // Copia local (tareas, subtareas, notas)
+                    _SectionHeader('Copia de seguridad local'),
+                    _SettingsCard(children: [
+                      ListTile(
+                        leading: const Icon(Icons.save_alt_rounded),
+                        title: const Text('Exportar tareas'),
+                        subtitle: const Text(
+                          'Guarda en un archivo JSON las tareas, subtareas y notas de este dispositivo',
+                        ),
+                        onTap: () => _exportTasksBackup(context, ref),
+                      ),
+                      _Divider(),
+                      ListTile(
+                        leading: const Icon(Icons.folder_open_rounded),
+                        title: const Text('Importar tareas'),
+                        subtitle: const Text(
+                          'Sustituye todas las tareas actuales por las del archivo. No cambia ajustes ni tableros',
+                        ),
+                        onTap: () => _importTasksBackup(context, ref),
+                      ),
+                    ]),
                     const SizedBox(height: 8),
 
                     // Tips
@@ -587,6 +615,146 @@ class _Divider extends StatelessWidget {
       indent: 46,
       color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.4),
     );
+  }
+}
+
+// ─── Exportar / importar tareas (JSON local) ─────────────────────────────────
+
+Future<void> _exportTasksBackup(BuildContext context, WidgetRef ref) async {
+  try {
+    final json =
+        await ref.read(taskBackupServiceProvider).exportToJsonString();
+    if (!context.mounted) return;
+    final stamp =
+        DateFormat('yyyy-MM-dd_HH-mm').format(DateTime.now());
+    final name = 'doboard-tareas_$stamp.json';
+    final bytes = utf8.encode(json);
+    final path = await FilePicker.platform.saveFile(
+      dialogTitle: 'Guardar copia de tareas',
+      fileName: name,
+      type: FileType.custom,
+      allowedExtensions: const ['json'],
+      bytes: bytes,
+    );
+    if (path == null || !context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          path.isEmpty ? 'Copia guardada' : 'Copia guardada: $path',
+        ),
+      ),
+    );
+  } catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo exportar: $e')),
+      );
+    }
+  }
+}
+
+Future<void> _importTasksBackup(BuildContext context, WidgetRef ref) async {
+  final picked = await FilePicker.platform.pickFiles(
+    type: FileType.custom,
+    allowedExtensions: const ['json'],
+    withData: true,
+  );
+  if (picked == null || picked.files.isEmpty) return;
+
+  final file = picked.files.single;
+  late final String raw;
+  try {
+    if (file.bytes != null) {
+      raw = utf8.decode(file.bytes!);
+    } else if (file.path != null) {
+      raw = await File(file.path!).readAsString(encoding: utf8);
+    } else {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No se pudo leer el archivo.')),
+        );
+      }
+      return;
+    }
+  } catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al leer el archivo: $e')),
+      );
+    }
+    return;
+  }
+
+  if (!context.mounted) return;
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Importar tareas'),
+      content: const Text(
+        'Se eliminarán todas las tareas, subtareas y notas que hay ahora en la app '
+        'y se sustituirán por las del archivo.\n\n'
+        'Los tableros y los ajustes no se modifican.\n\n'
+        '¿Quieres continuar?',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx, false),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(ctx, true),
+          child: const Text('Importar'),
+        ),
+      ],
+    ),
+  );
+  if (confirmed != true || !context.mounted) return;
+
+  showDialog<void>(
+    context: context,
+    barrierDismissible: false,
+    builder: (_) => const PopScope(
+      canPop: false,
+      child: Center(
+        child: Card(
+          child: Padding(
+            padding: EdgeInsets.all(28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('Importando…'),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+
+  try {
+    await ref.read(taskBackupServiceProvider).importFromJsonString(raw);
+    if (context.mounted) {
+      Navigator.of(context, rootNavigator: true).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Importación completada.')),
+      );
+    }
+  } on TaskBackupException catch (e) {
+    if (context.mounted) {
+      Navigator.of(context, rootNavigator: true).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
+    }
+  } catch (e) {
+    if (context.mounted) {
+      Navigator.of(context, rootNavigator: true).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo importar: $e')),
+      );
+    }
   }
 }
 

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/task_item_root"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:minHeight="36dp"
+    android:orientation="horizontal"
+    android:paddingTop="3dp"
+    android:paddingBottom="3dp">
+
+    <!-- Checkbox circular -->
+    <TextView
+        android:id="@+id/task_check"
+        android:layout_width="22dp"
+        android:layout_height="22dp"
+        android:background="@drawable/widget_check_undone"
+        android:gravity="center"
+        android:textColor="@android:color/white"
+        android:textSize="11sp"
+        android:textStyle="bold" />
+
+    <!-- Emoji frog (solo visible si isFrog = true) -->
+    <TextView
+        android:id="@+id/task_frog"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="4dp"
+        android:textSize="11sp" />
+
+    <!-- Título de la tarea -->
+    <TextView
+        android:id="@+id/task_title"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:layout_weight="1"
+        android:maxLines="2"
+        android:textColor="@color/widget_on_surface"
+        android:textSize="13sp" />
+
+</LinearLayout>

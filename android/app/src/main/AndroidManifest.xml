@@ -1,6 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Permisos — nivel manifest, fuera de <application> -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
@@ -28,8 +27,20 @@
             </intent-filter>
         </activity>
 
+        <!-- Diálogo «Añadir tarea» (widget existente) -->
         <activity
             android:name=".AddTaskWidgetActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:label=""
+            android:launchMode="singleTop"
+            android:taskAffinity=""
+            android:theme="@style/WidgetAddTaskDialogTheme"
+            android:windowSoftInputMode="adjustPan|stateVisible" />
+
+        <!-- Diálogo «Añadir a Hoy» (widget nuevo) -->
+        <activity
+            android:name=".TodayTasksWidgetActivity"
             android:excludeFromRecents="true"
             android:exported="false"
             android:label=""
@@ -42,12 +53,10 @@
             android:name="flutterEmbedding"
             android:value="2"/>
 
-        <!-- Sin intent-filter → puede ser exported="false" -->
         <receiver
             android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"
             android:exported="false"/>
 
-        <!-- Con intent-filter de sistema → DEBE ser exported="true" en Android 12+ -->
         <receiver
             android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver"
             android:exported="true">
@@ -65,6 +74,7 @@
             </intent-filter>
         </receiver>
 
+        <!-- Widget «Añadir tarea» (existente) -->
         <receiver
             android:name=".AddTaskWidgetProvider"
             android:exported="true"
@@ -77,6 +87,25 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_add_task_info" />
         </receiver>
+
+        <!-- Widget «Tareas de Hoy» (nuevo) -->
+        <receiver
+            android:name=".TodayTasksWidgetProvider"
+            android:exported="true"
+            android:label="@string/today_widget_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_today_tasks_info" />
+        </receiver>
+
+        <!-- RemoteViewsService para el ListView del widget «Hoy» -->
+        <service
+            android:name=".TodayTasksWidgetService"
+            android:exported="false"
+            android:permission="android.permission.BIND_REMOTEVIEWS" />
 
     </application>
 

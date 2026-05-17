@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Widget «Añadir tarea» (existente) -->
     <string name="widget_add_task_label">Añadir tarea</string>
     <string name="widget_add_task_description">Escribe una tarea y elige rápida, media o larga</string>
     <string name="widget_add_task_hint">Nueva tarea…</string>
@@ -8,4 +9,14 @@
     <string name="widget_chip_largas">Larga</string>
     <string name="widget_add_button">Añadir</string>
     <string name="widget_dialog_title">Nueva tarea</string>
+
+    <!-- Widget «Tareas de Hoy» (nuevo) -->
+    <string name="today_widget_label">Tareas de Hoy</string>
+    <string name="today_widget_description">Visualiza y gestiona tus tareas de hoy</string>
+    <string name="today_widget_empty">¡Todo listo por hoy! 🎉</string>
+    <string name="today_widget_hint">Tarea urgente…</string>
+    <string name="today_widget_add_title">Añadir a Hoy</string>
+    <string name="today_widget_add_subtitle">Se añadirá directamente al tablero Hoy</string>
+    <string name="today_widget_add_button">Añadir</string>
+    <string name="today_widget_cancel">Cancelar</string>
 </resources>

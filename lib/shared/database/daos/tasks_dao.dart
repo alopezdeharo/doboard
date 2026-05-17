@@ -5,6 +5,10 @@ import '../tables/tasks_table.dart';
 
 part 'tasks_dao.g.dart';
 
+/// Boards cuyas tareas nuevas se insertan al principio (posición mínima - 1).
+/// El resto de boards insertan al final (posición máxima + 1).
+const _topInsertBoards = {'board-hoy'};
+
 @DriftAccessor(tables: [Tasks])
 class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
   TasksDao(super.db);
@@ -15,9 +19,6 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
       ..orderBy([
             (t) => OrderingTerm.desc(t.isPinned),
             (t) => OrderingTerm.desc(t.isFrog),
-        // priority NO está en el ORDER BY: la prioridad se comunica
-        // visualmente con la barra de color lateral. El orden manual
-        // del usuario (position) tiene prioridad absoluta.
             (t) => OrderingTerm.asc(t.position),
       ]))
         .watch();
@@ -34,8 +35,6 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
         .watch();
   }
 
-  /// Stream de todas las tareas programadas pendientes, ordenadas por fecha.
-  /// Alimenta la pestaña Próximo del MainShell.
   Stream<List<TaskData>> watchScheduledTasks() {
     return (select(tasks)
       ..where((t) =>
@@ -48,8 +47,6 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
     return (select(tasks)..where((t) => t.id.equals(id))).getSingleOrNull();
   }
 
-  /// Stream reactivo de una tarea por ID.
-  /// Emite null si la tarea fue eliminada.
   Stream<TaskData?> watchTaskById(String id) {
     return (select(tasks)..where((t) => t.id.equals(id))).watchSingleOrNull();
   }
@@ -62,6 +59,41 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
     final result = await query.getSingle();
     return result.read(count) ?? 0;
   }
+
+  // ─── Helpers de posición ──────────────────────────────────────────────────
+
+  /// Devuelve la posición mínima actual del board, o 0 si está vacío.
+  Future<int> getMinPosition(String boardId) async {
+    final minPos = tasks.position.min();
+    final query = selectOnly(tasks)
+      ..addColumns([minPos])
+      ..where(tasks.boardId.equals(boardId));
+    final result = await query.getSingle();
+    return result.read(minPos) ?? 0;
+  }
+
+  /// Devuelve la posición máxima actual del board, o -1 si está vacío.
+  Future<int> getMaxPosition(String boardId) async {
+    final maxPos = tasks.position.max();
+    final query = selectOnly(tasks)
+      ..addColumns([maxPos])
+      ..where(tasks.boardId.equals(boardId));
+    final result = await query.getSingle();
+    return result.read(maxPos) ?? -1;
+  }
+
+  /// Calcula la posición de inserción según la regla del board:
+  ///  • Boards «ahora» (board-hoy): minPosition - 1  → aparece arriba.
+  ///  • Boards «algún día» (To Do): maxPosition + 1  → aparece abajo.
+  Future<int> nextInsertPosition(String boardId) async {
+    if (_topInsertBoards.contains(boardId)) {
+      return (await getMinPosition(boardId)) - 1;
+    } else {
+      return (await getMaxPosition(boardId)) + 1;
+    }
+  }
+
+  // ─── CRUD ────────────────────────────────────────────────────────────────
 
   Future<void> insertTask(TasksCompanion task) {
     return into(tasks).insert(task);
@@ -86,12 +118,12 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
     );
   }
 
-  Future<void> moveToBoard(String taskId, String targetBoardId) {
+  Future<void> moveToBoard(String taskId, String targetBoardId, int position) {
     return (update(tasks)..where((t) => t.id.equals(taskId))).write(
       TasksCompanion(
         boardId: Value(targetBoardId),
         isFrog: const Value(false),
-        position: const Value(0),
+        position: Value(position),
         scheduledDate: const Value(null),
         updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
       ),
@@ -155,30 +187,40 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
     ));
   }
 
-  Future<List<TaskData>> getTasksDueToMove(
-      String todayBoardId, int nowMs) async {
-    return (select(tasks)
-      ..where((t) =>
-      t.scheduledDate.isNotNull() &
-      t.scheduledDate.isSmallerOrEqualValue(nowMs) &
-      t.boardId.isNotValue(todayBoardId) &
-      t.isDone.equals(false)))
-        .get();
-  }
-
+  /// Mueve a «Hoy» todas las tareas cuya fecha programada ya llegó.
+  /// Las inserta al principio del board (minPosition - 1, decrementando
+  /// para cada tarea para preservar su orden relativo original).
   Future<int> moveScheduledTasksToToday(
       String todayBoardId, int nowMs) async {
-    return (update(tasks)
+    final due = await (select(tasks)
       ..where((t) =>
       t.scheduledDate.isNotNull() &
       t.scheduledDate.isSmallerOrEqualValue(nowMs) &
       t.boardId.isNotValue(todayBoardId) &
-      t.isDone.equals(false)))
-        .write(TasksCompanion(
-      boardId: Value(todayBoardId),
-      scheduledDate: const Value(null),
-      position: const Value(0),
-      updatedAt: Value(nowMs),
-    ));
+      t.isDone.equals(false))
+      ..orderBy([(t) => OrderingTerm.asc(t.scheduledDate)]))
+        .get();
+
+    if (due.isEmpty) return 0;
+
+    // Reservamos posiciones al principio: minPos-1, minPos-2, …
+    // (orden invertido para que la más antigua quede más arriba).
+    final minPos = await getMinPosition(todayBoardId);
+
+    await transaction(() async {
+      for (var i = 0; i < due.length; i++) {
+        final newPosition = minPos - (due.length - i);
+        await (update(tasks)..where((t) => t.id.equals(due[i].id))).write(
+          TasksCompanion(
+            boardId: Value(todayBoardId),
+            scheduledDate: const Value(null),
+            position: Value(newPosition),
+            updatedAt: Value(nowMs),
+          ),
+        );
+      }
+    });
+
+    return due.length;
   }
 }

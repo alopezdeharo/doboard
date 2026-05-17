@@ -48,15 +48,17 @@ class TaskRepositoryImpl implements ITaskRepository {
     Priority priority = Priority.low,
     String? detectedKeyword,
     String? parentTaskTitle,
-  }) {
+  }) async {
     final now = DateTime.now().millisecondsSinceEpoch;
+    // Hoy → arriba (minPos - 1). To Do → abajo (maxPos + 1).
+    final position = await _db.tasksDao.nextInsertPosition(boardId);
     return _db.tasksDao.insertTask(TasksCompanion(
       id: Value(id),
       boardId: Value(boardId),
       title: Value(title),
       content: Value(content),
       priority: Value(priority.value),
-      position: const Value(0),
+      position: Value(position),
       isDone: const Value(false),
       isFrog: const Value(false),
       isPinned: const Value(false),
@@ -104,8 +106,11 @@ class TaskRepositoryImpl implements ITaskRepository {
   }
 
   @override
-  Future<void> moveToBoard(String taskId, String targetBoardId) =>
-      _db.tasksDao.moveToBoard(taskId, targetBoardId);
+  Future<void> moveToBoard(String taskId, String targetBoardId) async {
+    // Mismo criterio que createTask: Hoy → arriba, resto → abajo.
+    final position = await _db.tasksDao.nextInsertPosition(targetBoardId);
+    return _db.tasksDao.moveToBoard(taskId, targetBoardId, position);
+  }
 
   @override
   Future<void> setFrog(String taskId, String boardId) =>
@@ -148,7 +153,6 @@ class TaskRepositoryImpl implements ITaskRepository {
         updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
       ),
     );
-    // Obtener título para el texto de la notificación
     final task = await _db.tasksDao.getTaskById(taskId);
     if (task != null) {
       try {
@@ -174,9 +178,8 @@ class TaskRepositoryImpl implements ITaskRepository {
   @override
   Future<int> processScheduledTasks(String todayBoardId) async {
     final now = DateTime.now().millisecondsSinceEpoch;
-    final count = await _db.tasksDao.moveScheduledTasksToToday(todayBoardId, now);
-    // Notificación inmediata de resumen (fallback si el usuario no vio
-    // la notificación programada por OS)
+    final count =
+        await _db.tasksDao.moveScheduledTasksToToday(todayBoardId, now);
     if (count > 0) {
       await NotificationService.instance.showTasksMovedNotification(count);
     }
@@ -240,6 +243,8 @@ class TaskRepositoryImpl implements ITaskRepository {
     final parentData = await _db.tasksDao.getTaskById(parentTaskId);
     final parentTitle = parentData?.title;
     final now = DateTime.now().millisecondsSinceEpoch;
+    // Subtarea promovida → aplica la misma regla de posición que createTask.
+    final position = await _db.tasksDao.nextInsertPosition(targetBoardId);
 
     await _db.transaction(() async {
       await ((_db.update(_db.subtasks))
@@ -251,7 +256,7 @@ class TaskRepositoryImpl implements ITaskRepository {
         boardId: Value(targetBoardId),
         title: Value(subtask.title),
         priority: const Value(0),
-        position: const Value(0),
+        position: Value(position),
         isDone: const Value(false),
         isFrog: const Value(false),
         isPinned: const Value(false),

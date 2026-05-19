@@ -18,19 +18,22 @@ class TaskCardDraggable extends ConsumerWidget {
     required this.task,
     required this.boardId,
     required this.index,
+    this.onToggleDone,
   });
 
   final Task task;
   final String boardId;
   final int index;
 
+  /// Callback para interceptar el toggle desde board_page (lógica de delay).
+  /// Si es null, TaskCard llama directamente al provider.
+  final void Function(bool isDone)? onToggleDone;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-
     return LongPressDraggable<Task>(
       data: task,
       delay: const Duration(milliseconds: 350),
-      // Haptic al iniciar el drag
       onDragStarted: () {
         HapticFeedback.mediumImpact();
         ref.read(dragStateProvider.notifier).state = task;
@@ -41,20 +44,26 @@ class TaskCardDraggable extends ConsumerWidget {
       onDraggableCanceled: (_, __) {
         ref.read(dragStateProvider.notifier).state = null;
       },
-      // Widget que sigue al dedo mientras se arrastra
       feedback: _DragFeedback(task: task),
-      // Tarjeta original durante el drag: atenuada
       childWhenDragging: Opacity(
         opacity: 0.3,
-        child: TaskCard(task: task, boardId: boardId, index: index),
+        child: TaskCard(
+          task: task,
+          boardId: boardId,
+          index: index,
+          onToggleDone: onToggleDone,
+        ),
       ),
-      child: TaskCard(task: task, boardId: boardId, index: index),
+      child: TaskCard(
+        task: task,
+        boardId: boardId,
+        index: index,
+        onToggleDone: onToggleDone,
+      ),
     );
   }
 }
 
-/// Widget flotante que sigue al dedo durante el drag.
-/// Ligeramente rotado y elevado para dar sensación de "levantar".
 class _DragFeedback extends StatelessWidget {
   const _DragFeedback({required this.task});
   final Task task;
@@ -62,13 +71,12 @@ class _DragFeedback extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Transform.rotate(
-      angle: -0.03, // ~1.7 grados
+      angle: -0.03,
       child: Material(
         elevation: 12,
         borderRadius: BorderRadius.circular(12),
         shadowColor: Colors.black38,
         child: SizedBox(
-          // Ancho fijo igual al ancho de pantalla menos padding del PageView
           width: MediaQuery.of(context).size.width * 0.84,
           child: TaskCard(task: task, boardId: '', index: 0),
         ),

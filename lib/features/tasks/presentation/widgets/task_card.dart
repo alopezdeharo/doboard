@@ -18,10 +18,15 @@ class TaskCard extends ConsumerStatefulWidget {
     required this.task,
     required this.boardId,
     required this.index,
+    this.onToggleDone,
   });
   final Task task;
   final String boardId;
   final int index;
+
+  /// Callback opcional para interceptar el toggle desde el padre (board_page).
+  /// Si es null, el card llama directamente a taskActionsProvider.
+  final void Function(bool isDone)? onToggleDone;
 
   @override
   ConsumerState<TaskCard> createState() => _TaskCardState();
@@ -39,10 +44,21 @@ class _TaskCardState extends ConsumerState<TaskCard> {
     if (_showMenu) setState(() => _showMenu = false);
   }
 
+  void _handleToggle(bool isDone) {
+    HapticFeedback.selectionClick();
+    if (widget.onToggleDone != null) {
+      widget.onToggleDone!(isDone);
+    } else {
+      ref.read(taskActionsProvider.notifier).toggleDone(
+            widget.task.id,
+            isDone: isDone,
+          );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final task = widget.task;
-    final actions = ref.read(taskActionsProvider.notifier);
 
     return GestureDetector(
       onTap: _showMenu ? _closeMenu : () => context.push('/task/${task.id}'),
@@ -59,7 +75,7 @@ class _TaskCardState extends ConsumerState<TaskCard> {
                 SlidableAction(
                   onPressed: (_) {
                     HapticFeedback.mediumImpact();
-                    actions.toggleDone(task.id, isDone: !task.isDone);
+                    _handleToggle(!task.isDone);
                   },
                   backgroundColor: task.isDone
                       ? Theme.of(context).colorScheme.surfaceVariant
@@ -82,7 +98,7 @@ class _TaskCardState extends ConsumerState<TaskCard> {
                 SlidableAction(
                   onPressed: (_) {
                     HapticFeedback.mediumImpact();
-                    actions.deleteTask(task.id);
+                    ref.read(taskActionsProvider.notifier).deleteTask(task.id);
                   },
                   backgroundColor: Theme.of(context).colorScheme.error,
                   foregroundColor: Theme.of(context).colorScheme.onError,
@@ -99,6 +115,7 @@ class _TaskCardState extends ConsumerState<TaskCard> {
               boardId: widget.boardId,
               index: widget.index,
               onMenuTap: _toggleMenu,
+              onToggleDone: _handleToggle,
             ),
           ),
           AnimatedSize(
@@ -106,10 +123,10 @@ class _TaskCardState extends ConsumerState<TaskCard> {
             curve: Curves.easeOutCubic,
             child: _showMenu
                 ? TaskContextMenu(
-              task: task,
-              boardId: widget.boardId,
-              onClose: _closeMenu,
-            )
+                    task: task,
+                    boardId: widget.boardId,
+                    onClose: _closeMenu,
+                  )
                 : const SizedBox.shrink(),
           ),
         ],
@@ -126,213 +143,207 @@ class _CardBody extends ConsumerWidget {
     required this.boardId,
     required this.index,
     required this.onMenuTap,
+    required this.onToggleDone,
   });
 
   final Task task;
   final String boardId;
   final int index;
   final VoidCallback onMenuTap;
+  final void Function(bool isDone) onToggleDone;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final actions = ref.read(taskActionsProvider.notifier);
     final isDone = task.isDone;
     final hasPriority = task.priority != Priority.low;
 
     final subtasksAsync = ref.watch(subtasksByTaskProvider(task.id));
     final subtasks = subtasksAsync.valueOrNull ?? [];
 
-    // hasNote reactivo: observa la nota directamente en lugar de usar
-    // task.hasNote, que nunca se popula desde watchTasksByBoard (sin JOIN).
     final noteAsync = ref.watch(noteByTaskProvider(task.id));
     final hasNote = noteAsync.valueOrNull != null;
 
     final frogEnabled = ref.watch(settingsProvider).maybeWhen(
-      data: (s) => s.frogEnabled,
-      orElse: () => true,
-    );
+          data: (s) => s.frogEnabled,
+          orElse: () => true,
+        );
     final showFrog = task.isFrog && frogEnabled;
 
     final priorityColor = task.priority == Priority.low
         ? Colors.transparent
         : Color(int.parse(task.priority.colorHex.replaceFirst('#', '0xFF')));
 
-    return Stack(
-      children: [
-        Container(
-          decoration: BoxDecoration(
-            color: showFrog
-                ? theme.colorScheme.primaryContainer.withOpacity(0.35)
-                : theme.colorScheme.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: theme.colorScheme.outlineVariant.withOpacity(0.5),
-              width: 0.5,
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 200),
+      opacity: isDone ? 0.5 : 1.0,
+      child: Stack(
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              color: showFrog
+                  ? theme.colorScheme.primaryContainer.withOpacity(0.35)
+                  : theme.colorScheme.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: theme.colorScheme.outlineVariant.withOpacity(0.5),
+                width: 0.5,
+              ),
             ),
-          ),
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(hasPriority ? 13 : 10, 9, 6, 9),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _AnimatedCheckbox(
-                  isDone: isDone,
-                  priority: task.priority,
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    actions.toggleDone(task.id, isDone: !isDone);
-                  },
-                ),
-                const SizedBox(width: 9),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (task.isPromotedSubtask) ...[
-                        Text(
-                          '↳ ${task.parentTaskTitle}',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            fontSize: 10,
-                            color:
-                            theme.colorScheme.onSurface.withOpacity(0.4),
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 2),
-                      ],
-                      if (showFrog) ...[
-                        _FrogBadge(),
-                        const SizedBox(height: 3),
-                      ],
-                      Row(children: [
-                        Expanded(
-                          child: Text(
-                            task.title,
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              color: isDone
-                                  ? theme.colorScheme.onSurface.withOpacity(0.35)
-                                  : theme.colorScheme.onSurface,
-                              decoration:
-                              isDone ? TextDecoration.lineThrough : null,
-                              decorationColor:
-                              theme.colorScheme.onSurface.withOpacity(0.35),
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        if (task.detectedKeyword != null) ...[
-                          const SizedBox(width: 4),
-                          Text(task.detectedKeyword!,
-                              style: const TextStyle(fontSize: 14)),
-                        ],
-                      ]),
-                      if (task.content != null &&
-                          task.content!.isNotEmpty &&
-                          !isDone) ...[
-                        const SizedBox(height: 2),
-                        ShaderMask(
-                          shaderCallback: (bounds) => const LinearGradient(
-                            begin: Alignment.centerLeft,
-                            end: Alignment.centerRight,
-                            colors: [
-                              Colors.black,
-                              Colors.black,
-                              Colors.transparent
-                            ],
-                            stops: [0, 0.75, 1],
-                          ).createShader(bounds),
-                          blendMode: BlendMode.dstIn,
-                          child: Text(
-                            task.content!,
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(hasPriority ? 13 : 10, 9, 6, 9),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _AnimatedCheckbox(
+                    isDone: isDone,
+                    priority: task.priority,
+                    onTap: () => onToggleDone(!isDone),
+                  ),
+                  const SizedBox(width: 9),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (task.isPromotedSubtask) ...[
+                          Text(
+                            '↳ ${task.parentTaskTitle}',
                             style: theme.textTheme.bodySmall?.copyWith(
-                              color:
-                              theme.colorScheme.onSurface.withOpacity(0.5),
+                              fontSize: 10,
+                              color: theme.colorScheme.onSurface.withOpacity(0.4),
                             ),
                             maxLines: 1,
-                            overflow: TextOverflow.clip,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                        ),
+                          const SizedBox(height: 2),
+                        ],
+                        if (showFrog) ...[
+                          _FrogBadge(),
+                          const SizedBox(height: 3),
+                        ],
+                        Row(children: [
+                          Expanded(
+                            child: Text(
+                              task.title,
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                color: isDone
+                                    ? theme.colorScheme.onSurface.withOpacity(0.6)
+                                    : theme.colorScheme.onSurface,
+                                decoration: isDone
+                                    ? TextDecoration.lineThrough
+                                    : null,
+                                decorationColor:
+                                    theme.colorScheme.onSurface.withOpacity(0.4),
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (task.detectedKeyword != null) ...[
+                            const SizedBox(width: 4),
+                            Text(task.detectedKeyword!,
+                                style: const TextStyle(fontSize: 14)),
+                          ],
+                        ]),
+                        if (task.content != null &&
+                            task.content!.isNotEmpty &&
+                            !isDone) ...[
+                          const SizedBox(height: 2),
+                          ShaderMask(
+                            shaderCallback: (bounds) => const LinearGradient(
+                              begin: Alignment.centerLeft,
+                              end: Alignment.centerRight,
+                              colors: [
+                                Colors.black,
+                                Colors.black,
+                                Colors.transparent
+                              ],
+                              stops: [0, 0.75, 1],
+                            ).createShader(bounds),
+                            blendMode: BlendMode.dstIn,
+                            child: Text(
+                              task.content!,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurface
+                                    .withOpacity(0.5),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.clip,
+                            ),
+                          ),
+                        ],
+                        if (!isDone && subtasks.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          _SubtaskPreview(subtasks: subtasks),
+                        ],
+                        if (!isDone && hasNote) ...[
+                          const SizedBox(height: 4),
+                          const Text('📝', style: TextStyle(fontSize: 12)),
+                        ],
+                        if (!isDone && task.isScheduled) ...[
+                          const SizedBox(height: 5),
+                          _ScheduledBadge(date: task.scheduledDate!),
+                        ],
                       ],
-
-                      // ── Preview subtareas ─────────────────────────────
-                      if (!isDone && subtasks.isNotEmpty) ...[
-                        const SizedBox(height: 6),
-                        _SubtaskPreview(subtasks: subtasks),
-                      ],
-
-                      if (!isDone && hasNote) ...[
-                        const SizedBox(height: 4),
-                        const Text('📝', style: TextStyle(fontSize: 12)),
-                      ],
-                      if (!isDone && task.isScheduled) ...[
-                        const SizedBox(height: 5),
-                        _ScheduledBadge(date: task.scheduledDate!),
-                      ],
-                    ],
-                  ),
-                ),
-                GestureDetector(
-                  onTap: () => _showQuickSubtaskInput(context, ref, task),
-                  behavior: HitTestBehavior.opaque,
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(4, 0, 0, 0),
-                    child: Icon(
-                      Icons.subdirectory_arrow_right_rounded,
-                      size: 16,
-                      color: theme.colorScheme.onSurface.withOpacity(0.3),
                     ),
                   ),
-                ),
-                GestureDetector(
-                  onTap: onMenuTap,
-                  behavior: HitTestBehavior.opaque,
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(4, 0, 2, 0),
-                    child: Icon(
-                      Icons.more_vert_rounded,
-                      size: 18,
-                      color: theme.colorScheme.onSurface.withOpacity(0.35),
+                  GestureDetector(
+                    onTap: () => _showQuickSubtaskInput(context, ref, task),
+                    behavior: HitTestBehavior.opaque,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(4, 0, 0, 0),
+                      child: Icon(
+                        Icons.subdirectory_arrow_right_rounded,
+                        size: 16,
+                        color: theme.colorScheme.onSurface.withOpacity(0.3),
+                      ),
                     ),
                   ),
-                ),
-                // ── Handle de reordenamiento ≡ ─────────────────────────
-                // Arrastrar este icono reordena dentro del tablero sin
-                // interferir con el LongPressDraggable (cambio de tablero).
-                ReorderableDragStartListener(
-                  index: index,
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(2, 0, 4, 0),
-                    child: Icon(
-                      Icons.drag_handle_rounded,
-                      size: 18,
-                      color: theme.colorScheme.onSurface.withOpacity(0.22),
+                  GestureDetector(
+                    onTap: onMenuTap,
+                    behavior: HitTestBehavior.opaque,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(4, 0, 2, 0),
+                      child: Icon(
+                        Icons.more_vert_rounded,
+                        size: 18,
+                        color: theme.colorScheme.onSurface.withOpacity(0.35),
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        if (hasPriority)
-          Positioned(
-            left: 0,
-            top: 0,
-            bottom: 0,
-            child: Container(
-              width: 3,
-              decoration: BoxDecoration(
-                color: priorityColor,
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(12),
-                  bottomLeft: Radius.circular(12),
-                ),
+                  ReorderableDragStartListener(
+                    index: index,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(2, 0, 4, 0),
+                      child: Icon(
+                        Icons.drag_handle_rounded,
+                        size: 18,
+                        color: theme.colorScheme.onSurface.withOpacity(0.22),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
-      ],
+          if (hasPriority)
+            Positioned(
+              left: 0,
+              top: 0,
+              bottom: 0,
+              child: Container(
+                width: 3,
+                decoration: BoxDecoration(
+                  color: priorityColor,
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(12),
+                    bottomLeft: Radius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 
@@ -356,19 +367,24 @@ class _CardBody extends ConsumerWidget {
         child: Row(children: [
           Icon(Icons.subdirectory_arrow_right_rounded,
               size: 18,
-              color: Theme.of(ctx).colorScheme.onSurface.withOpacity(0.4)),
+              color:
+                  Theme.of(ctx).colorScheme.onSurface.withOpacity(0.4)),
           const SizedBox(width: 10),
           Expanded(
             child: TextField(
               controller: controller,
               autofocus: true,
               textCapitalization: TextCapitalization.sentences,
-              style: TextStyle(color: Theme.of(ctx).colorScheme.onSurface),
+              style:
+                  TextStyle(color: Theme.of(ctx).colorScheme.onSurface),
               cursorColor: Theme.of(ctx).colorScheme.primary,
               decoration: InputDecoration(
                 hintText: 'Nueva subtarea en "${task.title}"...',
                 hintStyle: TextStyle(
-                  color: Theme.of(ctx).colorScheme.onSurface.withOpacity(0.4),
+                  color: Theme.of(ctx)
+                      .colorScheme
+                      .onSurface
+                      .withOpacity(0.4),
                   fontSize: 14,
                 ),
                 border: InputBorder.none,
@@ -401,10 +417,7 @@ class _CardBody extends ConsumerWidget {
   }
 }
 
-// ─── Preview subtareas con fade ───────────────────────────────────────────────
-// FIX PROBLEMA 1: Una subtarea promovida que además está completada (isDone=true)
-// ahora muestra ícono de check (atenuado) y texto tachado, igual que una subtarea
-// normal completada. Antes siempre mostraba el ícono "open_in_new" sin tachar.
+// ─── Preview subtareas ────────────────────────────────────────────────────────
 
 class _SubtaskPreview extends StatelessWidget {
   const _SubtaskPreview({required this.subtasks});
@@ -423,7 +436,7 @@ class _SubtaskPreview extends StatelessWidget {
           shaderCallback: (bounds) {
             if (remaining == 0) {
               return const LinearGradient(
-                  colors: [Colors.black, Colors.black])
+                      colors: [Colors.black, Colors.black])
                   .createShader(bounds);
             }
             return const LinearGradient(
@@ -438,56 +451,50 @@ class _SubtaskPreview extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: visible
                 .map((s) => Padding(
-              padding: const EdgeInsets.only(bottom: 2),
-              child: Row(children: [
-                // ── Ícono: si está done → check (con opacidad
-                // reducida si además es promoted).
-                // Si es promoted pero NO done → open_in_new.
-                // Si no es promoted y no está done → checkbox vacío.
-                Icon(
-                  s.isDone
-                      ? Icons.check_box_rounded
-                      : s.isPromoted
-                      ? Icons.open_in_new_rounded
-                      : Icons.check_box_outline_blank_rounded,
-                  size: 12,
-                  color: s.isDone
-                      ? (s.isPromoted
-                      ? theme.colorScheme.primary.withOpacity(0.4)
-                      : theme.colorScheme.primary)
-                      : s.isPromoted
-                      ? theme.colorScheme.onSurface.withOpacity(0.25)
-                      : theme.colorScheme.onSurface.withOpacity(0.4),
-                ),
-                const SizedBox(width: 4),
-                Expanded(
-                  child: Text(
-                    s.title,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      fontSize: 11,
-                      color: s.isDone
-                          ? theme.colorScheme.onSurface.withOpacity(0.3)
-                          : s.isPromoted
-                          ? theme.colorScheme.onSurface
-                          .withOpacity(0.25)
-                          : theme.colorScheme.onSurface
-                          .withOpacity(0.6),
-                      // Tachado cuando isDone, independientemente de
-                      // si también es promovida.
-                      decoration: s.isDone
-                          ? TextDecoration.lineThrough
-                          : null,
-                      decorationColor:
-                      theme.colorScheme.onSurface.withOpacity(0.3),
-                      fontStyle:
-                      s.isPromoted ? FontStyle.italic : null,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ]),
-            ))
+                      padding: const EdgeInsets.only(bottom: 2),
+                      child: Row(children: [
+                        Icon(
+                          s.isDone
+                              ? Icons.check_box_rounded
+                              : s.isPromoted
+                                  ? Icons.open_in_new_rounded
+                                  : Icons.check_box_outline_blank_rounded,
+                          size: 12,
+                          color: s.isDone
+                              ? (s.isPromoted
+                                  ? theme.colorScheme.primary.withOpacity(0.4)
+                                  : theme.colorScheme.primary)
+                              : s.isPromoted
+                                  ? theme.colorScheme.onSurface.withOpacity(0.25)
+                                  : theme.colorScheme.onSurface.withOpacity(0.4),
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            s.title,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              fontSize: 11,
+                              color: s.isDone
+                                  ? theme.colorScheme.onSurface.withOpacity(0.3)
+                                  : s.isPromoted
+                                      ? theme.colorScheme.onSurface
+                                          .withOpacity(0.25)
+                                      : theme.colorScheme.onSurface
+                                          .withOpacity(0.6),
+                              decoration: s.isDone
+                                  ? TextDecoration.lineThrough
+                                  : null,
+                              decorationColor:
+                                  theme.colorScheme.onSurface.withOpacity(0.3),
+                              fontStyle:
+                                  s.isPromoted ? FontStyle.italic : null,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ]),
+                    ))
                 .toList(),
           ),
         ),
@@ -547,7 +554,7 @@ class _AnimatedCheckbox extends StatelessWidget {
         ),
         child: isDone
             ? Icon(Icons.check_rounded,
-            size: 13, color: theme.colorScheme.onPrimary)
+                size: 13, color: theme.colorScheme.onPrimary)
             : null,
       ),
     );
@@ -576,24 +583,6 @@ class _FrogBadge extends StatelessWidget {
             )),
       ]),
     );
-  }
-}
-
-class _Badge extends StatelessWidget {
-  const _Badge({required this.icon, required this.label});
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = Theme.of(context).colorScheme.onSurface.withOpacity(0.35);
-    return Row(mainAxisSize: MainAxisSize.min, children: [
-      Icon(icon, size: 11, color: color),
-      const SizedBox(width: 2),
-      Text(label,
-          style:
-          Theme.of(context).textTheme.labelSmall?.copyWith(color: color)),
-    ]);
   }
 }
 

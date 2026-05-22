@@ -4,25 +4,66 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../features/settings/domain/entities/app_settings.dart';
 import '../../domain/entities/board.dart';
+import '../providers/boards_provider.dart';
 import '../widgets/board_page.dart';
 import '../widgets/board_nav_dots.dart';
 import '../../../tasks/presentation/providers/tasks_provider.dart';
 import '../../../tasks/presentation/widgets/quick_input_bar.dart';
 
-class WorkBoardPageScaffold extends ConsumerWidget {
+/// Shell persistente de la sección Tareas.
+///
+/// El header, las tabs y la barra de input se quedan fijos.
+/// Solo la lista de tareas del centro anima con un slide al cambiar de tab.
+class WorkBoardPageScaffold extends ConsumerStatefulWidget {
   const WorkBoardPageScaffold({
     super.key,
     required this.workBoards,
-    required this.workBoardIndex,
-    required this.onJumpToWorkBoardIndex,
   });
 
   final List<Board> workBoards;
-  final int workBoardIndex;
-  final ValueChanged<int> onJumpToWorkBoardIndex;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<WorkBoardPageScaffold> createState() =>
+      _WorkBoardPageScaffoldState();
+}
+
+class _WorkBoardPageScaffoldState
+    extends ConsumerState<WorkBoardPageScaffold> {
+  late PageController _boardPageController;
+  int _lastIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = ref.read(activeWorkBoardIndexProvider);
+    _lastIndex = initial;
+    _boardPageController = PageController(initialPage: initial);
+  }
+
+  @override
+  void dispose() {
+    _boardPageController.dispose();
+    super.dispose();
+  }
+
+  void _onTabTap(int index) {
+    if (index == _lastIndex) return;
+
+    ref.read(activeWorkBoardIndexProvider.notifier).state = index;
+
+    // Slide directo entre tabs (sin pasar por intermedios)
+    _boardPageController.animateToPage(
+      index,
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOutCubic,
+    );
+    _lastIndex = index;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final workBoards = widget.workBoards;
+
     if (workBoards.isEmpty) {
       return Scaffold(
         backgroundColor: Theme.of(context).colorScheme.surface,
@@ -32,8 +73,10 @@ class WorkBoardPageScaffold extends ConsumerWidget {
       );
     }
 
-    final safeIndex = workBoardIndex.clamp(0, workBoards.length - 1);
+    final activeIndex = ref.watch(activeWorkBoardIndexProvider);
+    final safeIndex = activeIndex.clamp(0, workBoards.length - 1);
     final currentBoard = workBoards[safeIndex];
+
     final settingsAsync = ref.watch(settingsProvider);
     final inputPos =
         settingsAsync.valueOrNull?.inputPosition ?? InputPosition.bottom;
@@ -43,18 +86,44 @@ class WorkBoardPageScaffold extends ConsumerWidget {
       body: SafeArea(
         child: Column(
           children: [
+            // ── Header fijo ─────────────────────────────────────────────────
             _WorkBoardsHeader(boardId: currentBoard.id),
+
             if (inputPos == InputPosition.top)
               QuickInputBar(boardId: currentBoard.id),
+
             const SizedBox(height: 8),
+
+            // ── Tabs fijas ──────────────────────────────────────────────────
             BoardNavTabs(
               boards: workBoards,
               currentIndex: safeIndex,
-              onTabTap: onJumpToWorkBoardIndex,
+              onTabTap: _onTabTap,
             ),
+
+            // ── Listas animadas ─────────────────────────────────────────────
+            // PageView interno con NeverScrollableScrollPhysics:
+            // - El usuario no puede hacer swipe (el outer PageView ya gestiona Hoy/Próximo)
+            // - Los tabs controlan la navegación programáticamente
+            // - _KeepAlivePage preserva el scroll de cada lista tras primera visita
             Expanded(
-              child: BoardPage(board: currentBoard, isActive: true),
+              child: PageView.builder(
+                controller: _boardPageController,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: workBoards.length,
+                itemBuilder: (context, index) {
+                  final board = workBoards[index];
+                  return _KeepAlivePage(
+                    key: ValueKey(board.id),
+                    child: BoardPage(
+                      board: board,
+                      isActive: index == safeIndex,
+                    ),
+                  );
+                },
+              ),
             ),
+
             if (inputPos == InputPosition.bottom)
               QuickInputBar(boardId: currentBoard.id),
           ],
@@ -63,6 +132,31 @@ class WorkBoardPageScaffold extends ConsumerWidget {
     );
   }
 }
+
+// ─── Wrapper KeepAlive ────────────────────────────────────────────────────────
+// Impide que el PageView descarte el scroll de páginas no activas.
+
+class _KeepAlivePage extends StatefulWidget {
+  const _KeepAlivePage({super.key, required this.child});
+  final Widget child;
+
+  @override
+  State<_KeepAlivePage> createState() => _KeepAlivePageState();
+}
+
+class _KeepAlivePageState extends State<_KeepAlivePage>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context); // obligatorio con AutomaticKeepAliveClientMixin
+    return widget.child;
+  }
+}
+
+// ─── Header ──────────────────────────────────────────────────────────────────
 
 class _WorkBoardsHeader extends ConsumerWidget {
   const _WorkBoardsHeader({required this.boardId});
@@ -82,7 +176,6 @@ class _WorkBoardsHeader extends ConsumerWidget {
               style: theme.textTheme.headlineLarge?.copyWith(
                 fontWeight: FontWeight.w800,
                 letterSpacing: -0.5,
-                // Color explícito para que funcione en tema claro Y oscuro
                 color: theme.colorScheme.onSurface,
               ),
             ),
@@ -100,6 +193,8 @@ class _WorkBoardsHeader extends ConsumerWidget {
     );
   }
 }
+
+// ─── Botón limpiar ────────────────────────────────────────────────────────────
 
 class _ClearCompletedButton extends ConsumerWidget {
   const _ClearCompletedButton({required this.boardId});
@@ -131,6 +226,8 @@ class _ClearCompletedButton extends ConsumerWidget {
     );
   }
 }
+
+// ─── Confirmación limpiar ─────────────────────────────────────────────────────
 
 class _ClearConfirmSheet extends StatelessWidget {
   const _ClearConfirmSheet();

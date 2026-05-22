@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/entities/board.dart';
+import '../../../tasks/presentation/providers/tasks_provider.dart';
 
-class BoardNavTabs extends StatelessWidget {
+class BoardNavTabs extends ConsumerWidget {
   const BoardNavTabs({
     super.key,
     required this.boards,
@@ -24,13 +26,13 @@ class BoardNavTabs extends StatelessWidget {
       fullName.replaceFirst('Tareas ', '').trim();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // ── Contenedor de pestañas ─────────────────────────────────────────
+        // ── Contenedor de pestañas ───────────────────────────────────────────
         Container(
           margin: const EdgeInsets.fromLTRB(16, 0, 16, 0),
           decoration: BoxDecoration(
@@ -44,6 +46,14 @@ class BoardNavTabs extends StatelessWidget {
               final color = i < _activeColors.length
                   ? _activeColors[i]
                   : theme.colorScheme.primary;
+
+              // Conteo de tareas pendientes para el badge
+              final countAsync =
+                  ref.watch(pendingTaskCountByBoardProvider(board.id));
+              final count = countAsync.maybeWhen(
+                data: (c) => c,
+                orElse: () => null,
+              );
 
               return Expanded(
                 child: GestureDetector(
@@ -69,16 +79,14 @@ class BoardNavTabs extends StatelessWidget {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // ── Icono + nombre en la misma fila ───────────────
+                        // ── Icono + nombre + badge en la misma fila ──────────
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
                               board.emoji,
-                              style: TextStyle(
-                                fontSize: isActive ? 15 : 14,
-                              ),
+                              style: TextStyle(fontSize: isActive ? 15 : 14),
                             ),
                             const SizedBox(width: 5),
                             AnimatedDefaultTextStyle(
@@ -94,10 +102,37 @@ class BoardNavTabs extends StatelessWidget {
                               ),
                               child: Text(_shortName(board.name)),
                             ),
+                            // ── Badge de conteo ───────────────────────────────
+                            if (count != null && count > 0) ...[
+                              const SizedBox(width: 4),
+                              AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 5, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: isActive
+                                      ? color.withOpacity(0.18)
+                                      : theme.colorScheme.onSurface
+                                          .withOpacity(0.08),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  '$count',
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: isActive
+                                        ? color
+                                        : theme.colorScheme.onSurface
+                                            .withOpacity(0.3),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                         const SizedBox(height: 3),
-                        // ── Subtítulo ──────────────────────────────────────
+                        // ── Subtítulo de duración ─────────────────────────────
                         Text(
                           board.subtitle,
                           style: theme.textTheme.labelSmall?.copyWith(
@@ -118,7 +153,7 @@ class BoardNavTabs extends StatelessWidget {
           ),
         ),
 
-        // ── Puntos de paginación ───────────────────────────────────────────
+        // ── Puntos de paginación ─────────────────────────────────────────────
         const SizedBox(height: 10),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,

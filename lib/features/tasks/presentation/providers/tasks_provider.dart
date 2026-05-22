@@ -8,19 +8,27 @@ import '../../domain/entities/task.dart';
 import '../../domain/repositories/i_task_repository.dart';
 
 final tasksByBoardProvider =
-StreamProvider.family<List<Task>, String>((ref, boardId) {
+    StreamProvider.family<List<Task>, String>((ref, boardId) {
   return ref.watch(taskRepositoryProvider).watchTasksByBoard(boardId);
 });
 
 final subtasksByTaskProvider =
-StreamProvider.family<List<Subtask>, String>((ref, taskId) {
+    StreamProvider.family<List<Subtask>, String>((ref, taskId) {
   return ref.watch(taskRepositoryProvider).watchSubtasksByTask(taskId);
 });
 
 /// Stream de todas las tareas programadas pendientes.
-/// Alimenta la pestaña Próximo del MainShell.
 final scheduledTasksProvider = StreamProvider<List<Task>>((ref) {
   return ref.watch(taskRepositoryProvider).watchScheduledTasks();
+});
+
+/// Número de tareas pendientes (no completadas) por tablero.
+/// Usado por el badge de conteo en las pestañas.
+final pendingTaskCountByBoardProvider =
+    Provider.family<AsyncValue<int>, String>((ref, boardId) {
+  return ref.watch(tasksByBoardProvider(boardId)).whenData(
+        (tasks) => tasks.where((t) => !t.isDone).length,
+      );
 });
 
 final dragStateProvider = StateProvider<Task?>((ref) => null);
@@ -51,8 +59,6 @@ class TaskActionsNotifier extends Notifier<AsyncValue<void>> {
 
   Future<void> updateTask(Task task) => _repo.updateTask(task);
 
-  /// Completa/descompleta una tarea.
-  /// Si fue una subtarea promovida, sincroniza el estado en el padre.
   Future<void> toggleDone(String taskId, {required bool isDone}) async {
     await _repo.toggleDone(taskId, isDone: isDone);
     await _repo.syncPromotedSubtaskDone(taskId, isDone: isDone);
@@ -60,7 +66,6 @@ class TaskActionsNotifier extends Notifier<AsyncValue<void>> {
 
   Future<void> deleteTask(String taskId) => _repo.deleteTask(taskId);
 
-  /// Mueve la tarea al tablero destino (posición 0 / cima).
   Future<void> moveToBoard(String taskId, String targetBoardId) =>
       _repo.moveToBoard(taskId, targetBoardId);
 
@@ -107,12 +112,10 @@ class TaskActionsNotifier extends Notifier<AsyncValue<void>> {
 }
 
 final taskActionsProvider =
-NotifierProvider<TaskActionsNotifier, AsyncValue<void>>(
-    TaskActionsNotifier.new);
+    NotifierProvider<TaskActionsNotifier, AsyncValue<void>>(
+        TaskActionsNotifier.new);
 
-/// Stream reactivo de una tarea por ID.
-/// Emite null si la tarea fue eliminada.
 final taskByIdProvider =
-StreamProvider.autoDispose.family<Task?, String>((ref, taskId) {
+    StreamProvider.autoDispose.family<Task?, String>((ref, taskId) {
   return ref.watch(taskRepositoryProvider).watchTaskById(taskId);
 });

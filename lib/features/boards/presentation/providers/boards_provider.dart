@@ -14,7 +14,6 @@ final allBoardsProvider = StreamProvider<List<Board>>((ref) {
 });
 
 /// Solo los tableros de trabajo (excluye 'board-hoy').
-/// Alimenta la pestaña Tableros del MainShell.
 final workBoardsProvider = StreamProvider<List<Board>>((ref) {
   return ref
       .watch(boardRepositoryProvider)
@@ -22,25 +21,20 @@ final workBoardsProvider = StreamProvider<List<Board>>((ref) {
       .map((boards) => boards.where((b) => b.id != 'board-hoy').toList());
 });
 
-/// Página activa del flujo horizontal único: 0 = Hoy, 1…N = tableros de
-/// trabajo en orden, N+1 = Próximo ([mainFlowPageCount] páginas en total).
+/// Índice del tablero de trabajo activo dentro de la pestaña Tareas.
+/// Separado del flujo principal (que ahora siempre tiene 3 páginas fijas).
+final activeWorkBoardIndexProvider = StateProvider<int>((ref) => 0);
+
+/// Flujo principal siempre tiene exactamente 3 páginas: Hoy · Tareas · Próximo.
 final mainFlowPageIndexProvider = StateProvider<int>((ref) => 0);
 
-/// Número de páginas: Hoy + tableros de trabajo + Próximo.
-int mainFlowPageCount(int workBoardCount) => 1 + workBoardCount + 1;
+int mainFlowPageCount(int workBoardCount) => 3;
 
-int clampMainFlowPage(int page, int workBoardCount) {
-  final last = mainFlowPageCount(workBoardCount) - 1;
-  if (last < 0) return 0;
-  return page.clamp(0, last);
-}
+int clampMainFlowPage(int page, int workBoardCount) => page.clamp(0, 2);
 
-/// Pestaña del [NavigationBar] (0=Hoy, 1=Tareas, 2=Próximo) según página global.
+/// Pestaña del [NavigationBar] según la página global (0=Hoy, 1=Tareas, 2=Próximo).
 int navBarSelectedIndexForMainFlowPage(int mainFlowPage, int workBoardCount) {
-  if (mainFlowPage <= 0) return 0;
-  final proximoPage = workBoardCount + 1;
-  if (mainFlowPage >= proximoPage) return 2;
-  return 1;
+  return mainFlowPage.clamp(0, 2);
 }
 
 /// Página global al pulsar una pestaña del navbar.
@@ -49,20 +43,5 @@ int mainFlowPageForNavBarTap(
   int workBoardCount,
   int currentMainFlowPage,
 ) {
-  switch (navIndex) {
-    case 0:
-      return 0;
-    case 2:
-      return clampMainFlowPage(workBoardCount + 1, workBoardCount);
-    case 1:
-    default:
-      if (workBoardCount == 0) return 0;
-      const workStart = 1;
-      final workEnd = workBoardCount;
-      if (currentMainFlowPage >= workStart &&
-          currentMainFlowPage <= workEnd) {
-        return currentMainFlowPage;
-      }
-      return workStart;
-  }
+  return navIndex.clamp(0, 2);
 }

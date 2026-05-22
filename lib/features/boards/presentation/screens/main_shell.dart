@@ -12,9 +12,9 @@ import '../../../tasks/presentation/providers/tasks_provider.dart';
 
 /// Shell principal de la app.
 ///
-/// Un único [PageView] con orden Hoy → tableros de trabajo → Próximo
-/// (sin bucle). El [NavigationBar] se deriva del índice global
-/// [mainFlowPageIndexProvider].
+/// [PageView] fijo de 3 páginas: Hoy · Tareas · Próximo.
+/// El cambio entre tableros de trabajo (Rápidas/Medias/Largas) ocurre
+/// DENTRO de la página Tareas sin reconstruir el shell.
 class MainShell extends ConsumerStatefulWidget {
   const MainShell({super.key});
 
@@ -23,11 +23,17 @@ class MainShell extends ConsumerStatefulWidget {
 }
 
 class _MainShellState extends ConsumerState<MainShell> {
-  PageController? _pageController;
+  late final PageController _pageController;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController(initialPage: 0);
+  }
 
   @override
   void dispose() {
-    _pageController?.dispose();
+    _pageController.dispose();
     super.dispose();
   }
 
@@ -36,21 +42,12 @@ class _MainShellState extends ConsumerState<MainShell> {
   }
 
   void _goToMainFlowPage(int index) {
-    final c = _pageController;
-    if (c == null || !c.hasClients) return;
-    c.animateToPage(
+    if (!_pageController.hasClients) return;
+    _pageController.animateToPage(
       index,
       duration: const Duration(milliseconds: 280),
       curve: Curves.easeOutCubic,
     );
-  }
-
-  void _syncProviderAndJump(int index) {
-    ref.read(mainFlowPageIndexProvider.notifier).state = index;
-    final c = _pageController;
-    if (c != null && c.hasClients) {
-      c.jumpToPage(index);
-    }
   }
 
   @override
@@ -59,6 +56,7 @@ class _MainShellState extends ConsumerState<MainShell> {
     final workBoardsAsync = ref.watch(workBoardsProvider);
     final visibleBoardsAsync = ref.watch(visibleBoardsProvider);
     final mainFlowPage = ref.watch(mainFlowPageIndexProvider);
+    final activeWorkBoardIndex = ref.watch(activeWorkBoardIndexProvider);
     final isDragging = ref.watch(dragStateProvider) != null;
 
     final settingsAsync = ref.watch(settingsProvider);
@@ -78,57 +76,42 @@ class _MainShellState extends ConsumerState<MainShell> {
           body: Center(child: Text('Error: $e')),
         ),
         data: (workBoards) {
-          final workCount = workBoards.length;
-          final pageCount = mainFlowPageCount(workCount);
-          final safePage = clampMainFlowPage(mainFlowPage, workCount);
-
-          _pageController ??= PageController(initialPage: safePage);
-
-          if (safePage != mainFlowPage) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (!mounted) return;
-              _syncProviderAndJump(safePage);
-            });
-          }
-
-          final navSelected =
-              navBarSelectedIndexForMainFlowPage(safePage, workCount);
-          final onWorkBoard =
-              workCount > 0 && safePage >= 1 && safePage <= workCount;
+          // Determinar qué tablero está activo para los drag targets.
+          final safeWorkIndex =
+              activeWorkBoardIndex.clamp(0, (workBoards.length - 1).clamp(0, 999));
+          final onWorkBoards = mainFlowPage == 1 && workBoards.isNotEmpty;
           final currentWorkBoardId =
-              onWorkBoard ? workBoards[safePage - 1].id : null;
+              onWorkBoards ? workBoards[safeWorkIndex].id : null;
 
           return Scaffold(
             backgroundColor: theme.colorScheme.surface,
             body: Stack(
               children: [
+                // ── Flujo de 3 páginas ──────────────────────────────────────
                 Positioned.fill(
-                  child: PageView.builder(
-                    controller: _pageController!,
+                  child: PageView(
+                    controller: _pageController,
                     physics: const ClampingScrollPhysics(),
                     onPageChanged: _onMainFlowPageChanged,
-                    itemCount: pageCount,
-                    itemBuilder: (context, index) {
-                      Widget page;
-                      if (index == 0) {
-                        page = const HoyScreen();
-                      } else if (index == pageCount - 1) {
-                        page = const ScheduledTasksScreen();
-                      } else {
-                        page = WorkBoardPageScaffold(
+                    children: [
+                      // 0 — Hoy
+                      const MainFlowKeepAlive(child: HoyScreen()),
+
+                      // 1 — Tareas (shell persistente con boards internos)
+                      MainFlowKeepAlive(
+                        child: WorkBoardPageScaffold(
                           workBoards: workBoards,
-                          workBoardIndex: index - 1,
-                          onJumpToWorkBoardIndex: (w) =>
-                              _goToMainFlowPage(1 + w),
-                        );
-                      }
-                      return MainFlowKeepAlive(child: page);
-                    },
+                        ),
+                      ),
+
+                      // 2 — Próximo
+                      const MainFlowKeepAlive(child: ScheduledTasksScreen()),
+                    ],
                   ),
                 ),
-                if (isDragging &&
-                    currentWorkBoardId != null &&
-                    onWorkBoard)
+
+                // ── Drag-and-drop targets ──────────────────────────────────
+                if (isDragging && currentWorkBoardId != null && onWorkBoards)
                   visibleBoardsAsync.maybeWhen(
                     data: (allBoards) => BoardDropTargets(
                       boards: allBoards,
@@ -138,16 +121,11 @@ class _MainShellState extends ConsumerState<MainShell> {
                   ),
               ],
             ),
+
+            // ── Barra de navegación inferior ───────────────────────────────
             bottomNavigationBar: NavigationBar(
-              selectedIndex: navSelected,
-              onDestinationSelected: (navIndex) {
-                final target = mainFlowPageForNavBarTap(
-                  navIndex,
-                  workCount,
-                  safePage,
-                );
-                _goToMainFlowPage(target);
-              },
+              selectedIndex: mainFlowPage.clamp(0, 2),
+              onDestinationSelected: _goToMainFlowPage,
               labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
               destinations: const [
                 NavigationDestination(

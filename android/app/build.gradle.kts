@@ -10,7 +10,7 @@ android {
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
-        isCoreLibraryDesugaringEnabled = true    // ← is + mayúscula
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
@@ -38,8 +38,15 @@ flutter {
     source = "../.."
 }
 
-// ← Bloque nuevo al final del archivo
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
     implementation("androidx.core:core-ktx:1.15.0")
+}
+
+// Excluir Glance y Compose-remote de home_widget ≥ 0.9.x.
+// El proyecto usa RemoteViews clásico — Glance no es necesario
+// y requeriría compileSdk 37 + AGP 9.1.0.
+configurations.all {
+    exclude(group = "androidx.glance", module = "glance-appwidget")
+    exclude(group = "androidx.compose.remote", module = "remote-creation-android")
 }

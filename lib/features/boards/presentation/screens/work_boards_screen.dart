@@ -9,8 +9,6 @@ import '../widgets/board_nav_dots.dart';
 import '../../../tasks/presentation/providers/tasks_provider.dart';
 import '../../../tasks/presentation/widgets/quick_input_bar.dart';
 
-/// Una página del flujo principal: un tablero de trabajo (cabecera, dots,
-/// lista). El deslizamiento entre tableros lo gestiona [MainShell].
 class WorkBoardPageScaffold extends ConsumerWidget {
   const WorkBoardPageScaffold({
     super.key,
@@ -45,18 +43,15 @@ class WorkBoardPageScaffold extends ConsumerWidget {
       body: SafeArea(
         child: Column(
           children: [
-            _WorkBoardsHeader(
-              boards: workBoards,
-              currentIndex: safeIndex,
-            ),
+            _WorkBoardsHeader(boardId: currentBoard.id),
             if (inputPos == InputPosition.top)
               QuickInputBar(boardId: currentBoard.id),
-            BoardNavDots(
-              count: workBoards.length,
+            const SizedBox(height: 8),
+            BoardNavTabs(
+              boards: workBoards,
               currentIndex: safeIndex,
-              onDotTap: onJumpToWorkBoardIndex,
+              onTabTap: onJumpToWorkBoardIndex,
             ),
-            const SizedBox(height: 4),
             Expanded(
               child: BoardPage(board: currentBoard, isActive: true),
             ),
@@ -69,54 +64,30 @@ class WorkBoardPageScaffold extends ConsumerWidget {
   }
 }
 
-// ─── Header de la pestaña Tableros ────────────────────────────────────────────
-
 class _WorkBoardsHeader extends ConsumerWidget {
-  const _WorkBoardsHeader({
-    required this.boards,
-    required this.currentIndex,
-  });
-
-  final List<Board> boards;
-  final int currentIndex;
+  const _WorkBoardsHeader({required this.boardId});
+  final String boardId;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final board = boards[currentIndex];
     final theme = Theme.of(context);
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 16, 0),
+      padding: const EdgeInsets.fromLTRB(20, 12, 12, 0),
       child: Row(
         children: [
-          Text(board.emoji, style: const TextStyle(fontSize: 22)),
-          const SizedBox(width: 8),
           Expanded(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 200),
-              child: Column(
-                key: ValueKey(board.id),
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    board.name,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-                  Text(
-                    board.subtitle,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurface.withOpacity(0.5),
-                    ),
-                  ),
-                ],
+            child: Text(
+              'Tareas',
+              style: theme.textTheme.headlineLarge?.copyWith(
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.5,
+                // Color explícito para que funcione en tema claro Y oscuro
+                color: theme.colorScheme.onSurface,
               ),
             ),
           ),
-          _ClearCompletedButton(boardId: board.id),
+          _ClearCompletedButton(boardId: boardId),
           const SizedBox(width: 4),
           IconButton(
             icon: const Icon(Icons.tune_rounded, size: 22),

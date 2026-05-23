@@ -17,13 +17,10 @@ final subtasksByTaskProvider =
   return ref.watch(taskRepositoryProvider).watchSubtasksByTask(taskId);
 });
 
-/// Stream de todas las tareas programadas pendientes.
 final scheduledTasksProvider = StreamProvider<List<Task>>((ref) {
   return ref.watch(taskRepositoryProvider).watchScheduledTasks();
 });
 
-/// Número de tareas pendientes (no completadas) por tablero.
-/// Usado por el badge de conteo en las pestañas.
 final pendingTaskCountByBoardProvider =
     Provider.family<AsyncValue<int>, String>((ref, boardId) {
   return ref.watch(tasksByBoardProvider(boardId)).whenData(
@@ -87,6 +84,16 @@ class TaskActionsNotifier extends Notifier<AsyncValue<void>> {
 
   Future<void> toggleSubtaskDone(String subtaskId, {required bool isDone}) =>
       _repo.toggleSubtaskDone(subtaskId, isDone: isDone);
+
+  /// Renombra una subtarea. Obtiene los datos actuales del stream activo
+  /// para hacer un copyWith limpio y no pisar isDone/position/etc.
+  Future<void> updateSubtaskTitle(String subtaskId, String newTitle) async {
+    // Buscamos la subtarea viva en el provider de subtareas del padre.
+    // Como no tenemos el taskId aquí, usamos el stream del cache de Riverpod:
+    // iterar todos los subtasksByTaskProvider activos no es limpio, así que
+    // delegamos al repo el UPDATE parcial solo del título.
+    await _repo.updateSubtaskTitle(subtaskId, newTitle.trim());
+  }
 
   Future<void> deleteSubtask(String subtaskId) =>
       _repo.deleteSubtask(subtaskId);

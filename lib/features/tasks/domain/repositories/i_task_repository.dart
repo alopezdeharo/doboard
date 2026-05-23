@@ -8,8 +8,6 @@ abstract interface class ITaskRepository {
   Stream<Task?> watchTaskById(String id);
   Future<Task?> getTaskById(String id);
 
-  /// Stream de todas las tareas programadas pendientes (scheduledDate != null),
-  /// ordenadas por fecha. Alimenta la pestaña Próximo.
   Stream<List<Task>> watchScheduledTasks();
 
   Future<void> createTask({
@@ -35,17 +33,9 @@ abstract interface class ITaskRepository {
   Future<int> countPendingByBoard(String boardId);
   Future<void> duplicateTask(String taskId);
 
-  /// Cuando se completa una tarea promovida, marca también la subtarea
-  /// original en el padre con el mismo estado.
   Future<void> syncPromotedSubtaskDone(String taskId, {required bool isDone});
-
-  /// Programa la tarea para moverse a "Hoy" en la fecha dada.
   Future<void> scheduleTask(String taskId, DateTime date);
-
-  /// Cancela la programación.
   Future<void> cancelSchedule(String taskId);
-
-  /// Mueve a "Hoy" todas las tareas cuya fecha programada ya llegó.
   Future<int> processScheduledTasks(String todayBoardId);
 
   Stream<List<Subtask>> watchSubtasksByTask(String taskId);
@@ -55,6 +45,10 @@ abstract interface class ITaskRepository {
     required String title,
   });
   Future<void> updateSubtask(Subtask subtask);
+
+  /// UPDATE parcial: solo actualiza el título, preserva isDone/position/etc.
+  Future<void> updateSubtaskTitle(String subtaskId, String newTitle);
+
   Future<void> toggleSubtaskDone(String id, {required bool isDone});
   Future<void> deleteSubtask(String id);
   Future<void> reorderSubtasks(String taskId, List<String> orderedIds);

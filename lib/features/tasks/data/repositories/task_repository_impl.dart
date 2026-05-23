@@ -50,7 +50,6 @@ class TaskRepositoryImpl implements ITaskRepository {
     String? parentTaskTitle,
   }) async {
     final now = DateTime.now().millisecondsSinceEpoch;
-    // Hoy → arriba (minPos - 1). To Do → abajo (maxPos + 1).
     final position = await _db.tasksDao.nextInsertPosition(boardId);
     return _db.tasksDao.insertTask(TasksCompanion(
       id: Value(id),
@@ -87,16 +86,16 @@ class TaskRepositoryImpl implements ITaskRepository {
     if (task == null || task.parentTaskTitle == null) return;
 
     final parents = await (_db.select(_db.tasks)
-      ..where((t) => t.title.equals(task.parentTaskTitle!)))
+          ..where((t) => t.title.equals(task.parentTaskTitle!)))
         .get();
     if (parents.isEmpty) return;
 
     for (final parent in parents) {
       final subs = await (_db.select(_db.subtasks)
-        ..where((s) =>
-        s.taskId.equals(parent.id) &
-        s.title.equals(task.title) &
-        s.isPromoted.equals(true)))
+            ..where((s) =>
+                s.taskId.equals(parent.id) &
+                s.title.equals(task.title) &
+                s.isPromoted.equals(true)))
           .get();
       for (final sub in subs) {
         await (_db.update(_db.subtasks)..where((s) => s.id.equals(sub.id)))
@@ -107,7 +106,6 @@ class TaskRepositoryImpl implements ITaskRepository {
 
   @override
   Future<void> moveToBoard(String taskId, String targetBoardId) async {
-    // Mismo criterio que createTask: Hoy → arriba, resto → abajo.
     final position = await _db.tasksDao.nextInsertPosition(targetBoardId);
     return _db.tasksDao.moveToBoard(taskId, targetBoardId, position);
   }
@@ -161,9 +159,7 @@ class TaskRepositoryImpl implements ITaskRepository {
           taskTitle: task.title,
           scheduledDate: normalizedDate,
         );
-      } catch (_) {
-        // La tarea ya quedó programada en DB; ignorar fallo de notificación.
-      }
+      } catch (_) {}
     }
   }
 
@@ -215,6 +211,13 @@ class TaskRepositoryImpl implements ITaskRepository {
   Future<void> updateSubtask(Subtask subtask) =>
       _db.subtasksDao.updateSubtask(subtask.toCompanion());
 
+  /// UPDATE parcial directo en Drift: solo toca el título.
+  /// No necesita conocer isDone/position/etc. del objeto en memoria.
+  @override
+  Future<void> updateSubtaskTitle(String subtaskId, String newTitle) =>
+      (_db.update(_db.subtasks)..where((s) => s.id.equals(subtaskId)))
+          .write(SubtasksCompanion(title: Value(newTitle)));
+
   @override
   Future<void> toggleSubtaskDone(String id, {required bool isDone}) =>
       _db.subtasksDao.toggleDone(id, isDone: isDone);
@@ -243,12 +246,11 @@ class TaskRepositoryImpl implements ITaskRepository {
     final parentData = await _db.tasksDao.getTaskById(parentTaskId);
     final parentTitle = parentData?.title;
     final now = DateTime.now().millisecondsSinceEpoch;
-    // Subtarea promovida → aplica la misma regla de posición que createTask.
     final position = await _db.tasksDao.nextInsertPosition(targetBoardId);
 
     await _db.transaction(() async {
       await ((_db.update(_db.subtasks))
-        ..where((s) => s.id.equals(subtaskId)))
+            ..where((s) => s.id.equals(subtaskId)))
           .write(const SubtasksCompanion(isPromoted: Value(true)));
 
       await _db.tasksDao.insertTask(TasksCompanion(

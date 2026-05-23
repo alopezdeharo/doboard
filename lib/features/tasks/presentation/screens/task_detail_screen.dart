@@ -15,6 +15,10 @@ import '../../domain/entities/priority.dart';
 import '../providers/tasks_provider.dart';
 import '../widgets/subtask_item.dart';
 
+// Límite compartido con SubtaskItem y la BD (subtasks_table: max: 200)
+const _kSubtaskMaxLength = 200;
+const _kSubtaskWarnAt    = 150;
+
 class TaskDetailScreen extends ConsumerWidget {
   const TaskDetailScreen({super.key, required this.taskId});
   final String taskId;
@@ -465,31 +469,55 @@ class _SubtaskSection extends HookConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
+    final theme      = Theme.of(context);
     final isCollapsed = useState(false);
-    final isAdding = useState(false);
-    final inputCtrl = useTextEditingController();
+    final isAdding   = useState(false);
+    final charCount  = useState(0);
+    final inputCtrl  = useTextEditingController();
     final subtasksAsync = ref.watch(subtasksByTaskProvider(task.id));
-    final actions = ref.read(taskActionsProvider.notifier);
+    final actions    = ref.read(taskActionsProvider.notifier);
+
+    // Actualizar contador al escribir
+    useEffect(() {
+      void listener() => charCount.value = inputCtrl.text.length;
+      inputCtrl.addListener(listener);
+      return () => inputCtrl.removeListener(listener);
+    }, [inputCtrl]);
 
     Future<void> addSubtask() async {
+      // Truncamos por si acaso, aunque maxLength ya lo impide en el TextField
       final title = inputCtrl.text.trim();
-      if (title.isEmpty) {
+      final safe  = title.length > _kSubtaskMaxLength
+          ? title.substring(0, _kSubtaskMaxLength)
+          : title;
+      if (safe.isEmpty) {
         isAdding.value = false;
         return;
       }
-      await actions.createSubtask(taskId: task.id, title: title);
+      await actions.createSubtask(taskId: task.id, title: safe);
       inputCtrl.clear();
+      charCount.value = 0;
     }
 
+    // Mismo comportamiento que editar: guardar al salir de pantalla
     useEffect(() {
       return () {
         final title = inputCtrl.text.trim();
-        if (isAdding.value && title.isNotEmpty) {
-          actions.createSubtask(taskId: task.id, title: title);
+        final safe  = title.length > _kSubtaskMaxLength
+            ? title.substring(0, _kSubtaskMaxLength)
+            : title;
+        if (isAdding.value && safe.isNotEmpty) {
+          actions.createSubtask(taskId: task.id, title: safe);
         }
       };
     }, []);
+
+    // Color del contador
+    Color counterColor(int count) {
+      if (count >= _kSubtaskMaxLength) return theme.colorScheme.error;
+      if (count >= _kSubtaskWarnAt)    return const Color(0xFFEFAA27);
+      return Colors.transparent;
+    }
 
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       // ── Cabecera colapsable ──────────────────────────────────────────────
@@ -533,7 +561,6 @@ class _SubtaskSection extends HookConsumerWidget {
                 subtasksAsync.when(
                   loading: () => const SizedBox.shrink(),
                   error: (_, __) => const SizedBox.shrink(),
-                  // Usa el widget separado con edición de título inline
                   data: (subs) => Column(
                       children: subs
                           .map((s) => SubtaskItem(
@@ -552,13 +579,18 @@ class _SubtaskSection extends HookConsumerWidget {
                         decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(5),
                             border: Border.all(
-                                color:
-                                    theme.colorScheme.outline.withOpacity(0.4),
+                                color: theme.colorScheme.outline
+                                    .withOpacity(0.4),
                                 width: 1.5))),
                     Expanded(
                       child: TextField(
                         controller: inputCtrl,
                         autofocus: true,
+                        maxLength: _kSubtaskMaxLength,
+                        maxLines: null,
+                        // Ocultamos el contador nativo — usamos el nuestro
+                        buildCounter: (_, {required currentLength,
+                              required isFocused, maxLength}) => null,
                         onSubmitted: (_) => addSubtask(),
                         onTapOutside: (_) {
                           addSubtask();
@@ -576,6 +608,23 @@ class _SubtaskSection extends HookConsumerWidget {
                         ),
                       ),
                     ),
+                    // ── Contador igual que en SubtaskItem ──────────────────
+                    AnimatedOpacity(
+                      duration: const Duration(milliseconds: 200),
+                      opacity:
+                          charCount.value >= _kSubtaskWarnAt ? 1.0 : 0.0,
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 6),
+                        child: Text(
+                          '${_kSubtaskMaxLength - charCount.value}',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: counterColor(charCount.value),
+                          ),
+                        ),
+                      ),
+                    ),
                   ]),
                 ],
                 const SizedBox(height: 8),
@@ -584,12 +633,13 @@ class _SubtaskSection extends HookConsumerWidget {
                   child: Row(children: [
                     Icon(Icons.add_rounded,
                         size: 16,
-                        color: theme.colorScheme.onSurface.withOpacity(0.35)),
+                        color:
+                            theme.colorScheme.onSurface.withOpacity(0.35)),
                     const SizedBox(width: 6),
                     Text('Añadir subtarea',
                         style: theme.textTheme.bodySmall?.copyWith(
-                            color:
-                                theme.colorScheme.onSurface.withOpacity(0.4))),
+                            color: theme.colorScheme.onSurface
+                                .withOpacity(0.4))),
                   ]),
                 ),
               ]),

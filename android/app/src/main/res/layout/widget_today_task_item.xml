@@ -1,13 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+    task_item_root cubre toda la fila → toggle al tap en cualquier punto.
+    android:clickable + android:focusable son necesarios en algunos launchers
+    para que RemoteViews propague el fill-intent al root correctamente.
+-->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/task_item_root"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    android:clickable="true"
+    android:focusable="true"
     android:gravity="center_vertical"
-    android:minHeight="36dp"
+    android:minHeight="40dp"
     android:orientation="horizontal"
-    android:paddingTop="3dp"
-    android:paddingBottom="3dp">
+    android:paddingStart="2dp"
+    android:paddingTop="4dp"
+    android:paddingEnd="2dp"
+    android:paddingBottom="4dp">
 
     <!-- Checkbox circular -->
     <TextView

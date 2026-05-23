@@ -77,6 +77,20 @@ class AddTaskWidgetProvider : HomeWidgetProvider() {
             buildSelectPendingIntent(context, BOARD_LARGAS, REQUEST_CHIP_LARGAS),
         )
 
+        // ── Título «Doboard» → abre la app directamente ─────────────────────
+        val openAppIntent = context.packageManager
+            .getLaunchIntentForPackage(context.packageName)
+            ?.apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP }
+        if (openAppIntent != null) {
+            val openAppPendingIntent = PendingIntent.getActivity(
+                context,
+                REQUEST_OPEN_APP,
+                openAppIntent,
+                pendingIntentFlags(),
+            )
+            views.setOnClickPendingIntent(R.id.widget_title, openAppPendingIntent)
+        }
+
         return views
     }
 
@@ -113,7 +127,6 @@ class AddTaskWidgetProvider : HomeWidgetProvider() {
         )
     }
 
-    /** Abre un diálogo nativo con teclado (fiable en Samsung One UI). */
     private fun buildAddPendingIntent(context: Context, boardId: String): PendingIntent {
         val intent = Intent(context, AddTaskWidgetActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -183,22 +196,23 @@ class AddTaskWidgetProvider : HomeWidgetProvider() {
     }
 
     companion object {
-        const val PREF_SELECTED_BOARD = "selected_board_id"
-        const val PREF_LAST_FEEDBACK = "last_feedback"
+        const val PREF_SELECTED_BOARD  = "selected_board_id"
+        const val PREF_LAST_FEEDBACK   = "last_feedback"
         const val PREF_LAST_FEEDBACK_AT = "last_feedback_at"
         private const val FEEDBACK_VISIBLE_MS = 2_500L
 
         const val BOARD_RAPIDAS = "board-rapidas"
-        const val BOARD_MEDIAS = "board-calma"
-        const val BOARD_LARGAS = "board-prisa"
+        const val BOARD_MEDIAS  = "board-calma"
+        const val BOARD_LARGAS  = "board-prisa"
 
-        private const val ACTION_SELECT_BOARD = "com.adrisdev.doboard.WIDGET_SELECT_BOARD"
-        private const val EXTRA_BOARD_ID = "board_id"
+        private const val ACTION_SELECT_BOARD  = "com.adrisdev.doboard.WIDGET_SELECT_BOARD"
+        private const val EXTRA_BOARD_ID       = "board_id"
 
         private const val REQUEST_CHIP_RAPIDAS = 10
-        private const val REQUEST_CHIP_MEDIAS = 11
-        private const val REQUEST_CHIP_LARGAS = 12
-        private const val REQUEST_ADD = 13
+        private const val REQUEST_CHIP_MEDIAS  = 11
+        private const val REQUEST_CHIP_LARGAS  = 12
+        private const val REQUEST_ADD          = 13
+        private const val REQUEST_OPEN_APP     = 14   // nuevo — tap en título
 
         private val CHIP_RAPIDAS = ChipStyle(
             selectedBg = R.drawable.widget_chip_rapidas_selected,

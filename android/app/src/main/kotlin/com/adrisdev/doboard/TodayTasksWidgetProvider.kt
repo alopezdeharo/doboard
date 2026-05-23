@@ -92,6 +92,20 @@ class TodayTasksWidgetProvider : HomeWidgetProvider() {
         )
         views.setOnClickPendingIntent(R.id.today_btn_add, addPendingIntent)
 
+        // ── Título «🐸 Hoy» → abre la app directamente ──────────────────────
+        val openAppIntent = context.packageManager
+            .getLaunchIntentForPackage(context.packageName)
+            ?.apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP }
+        if (openAppIntent != null) {
+            val openAppPendingIntent = PendingIntent.getActivity(
+                context,
+                REQUEST_OPEN_APP_TODAY,
+                openAppIntent,
+                pendingIntentFlags(),
+            )
+            views.setOnClickPendingIntent(R.id.today_widget_title, openAppPendingIntent)
+        }
+
         return views
     }
 
@@ -116,8 +130,9 @@ class TodayTasksWidgetProvider : HomeWidgetProvider() {
         const val KEY_LAST_FEEDBACK    = "today_last_feedback"
         const val KEY_LAST_FEEDBACK_AT = "today_last_feedback_at"
 
-        private const val FEEDBACK_VISIBLE_MS = 2_500L
-        private const val REQUEST_TOGGLE      = 21
-        private const val REQUEST_ADD         = 22
+        private const val FEEDBACK_VISIBLE_MS    = 2_500L
+        private const val REQUEST_TOGGLE         = 21
+        private const val REQUEST_ADD            = 22
+        private const val REQUEST_OPEN_APP_TODAY = 23
     }
 }

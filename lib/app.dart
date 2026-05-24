@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -55,7 +56,18 @@ class _DoboardAppState extends ConsumerState<DoboardApp>
       darkTheme: AppTheme.dark,
       themeMode: themeMode,
       routerConfig: appRouter,
+
+      // Localización: necesario para el date picker en español (lunes primero)
+      // y para cualquier widget de Material que dependa de traducciones.
+      locale: const Locale('es', 'ES'),
+      supportedLocales: const [
+        Locale('es', 'ES'),
+        Locale('en', 'US'),
+      ],
       localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
         FlutterQuillLocalizations.delegate,
       ],
     );

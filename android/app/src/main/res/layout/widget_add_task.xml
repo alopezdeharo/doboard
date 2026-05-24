@@ -32,6 +32,7 @@
             android:visibility="gone" />
     </LinearLayout>
 
+    <!-- Fila de input: hint a la izquierda, + centrado verticalmente -->
     <LinearLayout
         android:id="@+id/widget_input_row"
         android:layout_width="match_parent"
@@ -54,16 +55,19 @@
             android:textColor="@color/widget_on_surface_muted"
             android:textSize="14sp" />
 
+        <!-- gravity="center" centra el símbolo + dentro del círculo -->
         <TextView
             android:id="@+id/widget_btn_add"
             android:layout_width="36dp"
             android:layout_height="36dp"
+            android:layout_gravity="center_vertical"
             android:background="@drawable/widget_add_btn_bg"
             android:contentDescription="@string/widget_add_button"
             android:gravity="center"
+            android:includeFontPadding="false"
             android:text="+"
             android:textColor="@android:color/white"
-            android:textSize="22sp"
+            android:textSize="24sp"
             android:textStyle="bold" />
     </LinearLayout>
 

@@ -35,7 +35,7 @@
             android:textSize="12sp"
             android:visibility="gone" />
 
-        <!-- Botón «+» para añadir tarea urgente -->
+        <!-- Mismo tratamiento que el widget Doboard: includeFontPadding=false + gravity=center -->
         <TextView
             android:id="@+id/today_btn_add"
             android:layout_width="32dp"
@@ -43,9 +43,10 @@
             android:background="@drawable/widget_add_btn_bg"
             android:contentDescription="@string/today_widget_add_button"
             android:gravity="center"
+            android:includeFontPadding="false"
             android:text="+"
             android:textColor="@android:color/white"
-            android:textSize="20sp"
+            android:textSize="22sp"
             android:textStyle="bold" />
     </LinearLayout>
 

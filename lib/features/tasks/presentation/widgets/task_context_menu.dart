@@ -132,14 +132,14 @@ class TaskContextMenu extends ConsumerWidget {
               ),
             ),
             ...otherBoards.map((board) => _MenuItem(
-              icon: null,
-              emoji: board.emoji,
-              label: board.name,
-              onTap: () {
-                actions.moveToBoard(task.id, board.id);
-                onClose();
-              },
-            )),
+                  icon: null,
+                  emoji: board.emoji,
+                  label: board.name,
+                  onTap: () {
+                    actions.moveToBoard(task.id, board.id);
+                    onClose();
+                  },
+                )),
             _Divider(),
           ],
 
@@ -200,6 +200,8 @@ class TaskContextMenu extends ConsumerWidget {
       initialDate: now.add(const Duration(days: 1)),
       firstDate: now,
       lastDate: now.add(const Duration(days: 365)),
+      // Lunes como primer día de semana (estándar en España)
+      locale: const Locale('es', 'ES'),
       helpText: 'La tarea se moverá a "Hoy" en esta fecha',
       confirmText: 'Programar',
       cancelText: 'Cancelar',

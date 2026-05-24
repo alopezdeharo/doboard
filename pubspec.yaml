@@ -11,6 +11,10 @@ dependencies:
   flutter:
     sdk: flutter
 
+  # Localización (date picker en español, primer día lunes)
+  flutter_localizations:
+    sdk: flutter
+
   # ─────────────────────────────────────────
   # STATE MANAGEMENT
   # ─────────────────────────────────────────
@@ -141,14 +145,6 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
-
-  # ─────────────────────────────────────────
-  # GENERACIÓN DE CÓDIGO (build_runner)
-  # ─────────────────────────────────────────
-
-  # build_runner: motor de generación de código
-  # Un solo comando genera todo: Freezed + Drift + Riverpod
-  # flutter pub run build_runner build --delete-conflicting-outputs
   build_runner: ^2.4.11
 
   # Generador de Drift (tablas, queries, DAOs)

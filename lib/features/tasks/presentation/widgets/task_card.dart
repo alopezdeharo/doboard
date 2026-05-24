@@ -15,9 +15,9 @@ import 'task_context_menu.dart';
 // ─── Paleta de colores por duración ──────────────────────────────────────────
 // Centralizada aquí para que sea fácil de cambiar en el futuro.
 abstract final class BoardColors {
-  static const rapidas = Color(0xFFEFAA27); // ámbar   — urgencia, acción inmediata
-  static const medias  = Color(0xFF4DB87A); // verde   — flujo, progreso constante
-  static const largas  = Color(0xFF5B7FD4); // índigo  — profundidad, concentración
+  static const rapidas = Color(0xFFEFAA27);
+  static const medias  = Color(0xFF4DB87A);
+  static const largas  = Color(0xFF5B7FD4);
 }
 
 class TaskCard extends ConsumerStatefulWidget {
@@ -176,7 +176,6 @@ class _CardBody extends ConsumerWidget {
           orElse: () => true,
         );
     final showFrog = task.isFrog && frogEnabled;
-
     final showPriorityBar = !isDone && task.priority == Priority.high;
 
     return AnimatedOpacity(
@@ -201,24 +200,14 @@ class _CardBody extends ConsumerWidget {
               children: [
                 // ── Barra vertical de prioridad ───────────────────────────
                 if (showPriorityBar)
-                  Container(
-                    width: _priorityBarWidth,
-                    color: BoardColors.rapidas,
-                  ),
-
-                // ── Contenido de la tarjeta ───────────────────────────────
+                  Container(width: _priorityBarWidth, color: BoardColors.rapidas),
                 Expanded(
                   child: Padding(
                     padding: EdgeInsets.fromLTRB(
-                      showPriorityBar ? 2 : 6,
-                      9,
-                      6,
-                      9,
-                    ),
+                        showPriorityBar ? 2 : 6, 9, 6, 9),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // ── Checkbox ──────────────────────────────────────
                         GestureDetector(
                           onTap: () => onToggleDone(!isDone),
                           behavior: HitTestBehavior.opaque,
@@ -227,9 +216,7 @@ class _CardBody extends ConsumerWidget {
                             height: 44,
                             child: Center(
                               child: _AnimatedCheckbox(
-                                isDone: isDone,
-                                priority: task.priority,
-                              ),
+                                  isDone: isDone, priority: task.priority),
                             ),
                           ),
                         ),
@@ -263,8 +250,8 @@ class _CardBody extends ConsumerWidget {
                                     Expanded(
                                       child: Text(
                                         task.title,
-                                        style:
-                                            theme.textTheme.titleSmall?.copyWith(
+                                        style: theme.textTheme.titleSmall
+                                            ?.copyWith(
                                           color: isDone
                                               ? theme.colorScheme.onSurface
                                                   .withOpacity(0.6)
@@ -283,8 +270,7 @@ class _CardBody extends ConsumerWidget {
                                     if (task.detectedKeyword != null) ...[
                                       const SizedBox(width: 4),
                                       Text(task.detectedKeyword!,
-                                          style:
-                                              const TextStyle(fontSize: 14)),
+                                          style: const TextStyle(fontSize: 14)),
                                     ],
                                   ],
                                 ),
@@ -311,8 +297,7 @@ class _CardBody extends ConsumerWidget {
                                     blendMode: BlendMode.dstIn,
                                     child: Text(
                                       task.content!,
-                                      style:
-                                          theme.textTheme.bodySmall?.copyWith(
+                                      style: theme.textTheme.bodySmall?.copyWith(
                                         color: theme.colorScheme.onSurface
                                             .withOpacity(0.5),
                                       ),
@@ -345,12 +330,10 @@ class _CardBody extends ConsumerWidget {
                           behavior: HitTestBehavior.opaque,
                           child: Padding(
                             padding: const EdgeInsets.fromLTRB(4, 0, 0, 0),
-                            child: Icon(
-                              Icons.subdirectory_arrow_right_rounded,
-                              size: 16,
-                              color:
-                                  theme.colorScheme.onSurface.withOpacity(0.3),
-                            ),
+                            child: Icon(Icons.subdirectory_arrow_right_rounded,
+                                size: 16,
+                                color: theme.colorScheme.onSurface
+                                    .withOpacity(0.3)),
                           ),
                         ),
                         GestureDetector(
@@ -358,24 +341,20 @@ class _CardBody extends ConsumerWidget {
                           behavior: HitTestBehavior.opaque,
                           child: Padding(
                             padding: const EdgeInsets.fromLTRB(4, 0, 2, 0),
-                            child: Icon(
-                              Icons.more_vert_rounded,
-                              size: 18,
-                              color: theme.colorScheme.onSurface
-                                  .withOpacity(0.35),
-                            ),
+                            child: Icon(Icons.more_vert_rounded,
+                                size: 18,
+                                color: theme.colorScheme.onSurface
+                                    .withOpacity(0.35)),
                           ),
                         ),
                         ReorderableDragStartListener(
                           index: index,
                           child: Padding(
                             padding: const EdgeInsets.fromLTRB(2, 0, 4, 0),
-                            child: Icon(
-                              Icons.drag_handle_rounded,
-                              size: 18,
-                              color: theme.colorScheme.onSurface
-                                  .withOpacity(0.22),
-                            ),
+                            child: Icon(Icons.drag_handle_rounded,
+                                size: 18,
+                                color: theme.colorScheme.onSurface
+                                    .withOpacity(0.22)),
                           ),
                         ),
                       ],
@@ -416,13 +395,16 @@ class _CardBody extends ConsumerWidget {
               controller: controller,
               autofocus: true,
               textCapitalization: TextCapitalization.sentences,
-              style: TextStyle(color: Theme.of(ctx).colorScheme.onSurface),
+              style:
+                  TextStyle(color: Theme.of(ctx).colorScheme.onSurface),
               cursorColor: Theme.of(ctx).colorScheme.primary,
               decoration: InputDecoration(
                 hintText: 'Nueva subtarea en "${task.title}"...',
                 hintStyle: TextStyle(
-                  color:
-                      Theme.of(ctx).colorScheme.onSurface.withOpacity(0.4),
+                  color: Theme.of(ctx)
+                      .colorScheme
+                      .onSurface
+                      .withOpacity(0.4),
                   fontSize: 14,
                 ),
                 border: InputBorder.none,
@@ -475,23 +457,14 @@ class _PriorityBadge extends StatelessWidget {
         ),
       Priority.low => ('', Colors.transparent, Colors.transparent),
     };
-
     if (label.isEmpty) return const SizedBox.shrink();
-
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.w600,
-          color: textColor,
-        ),
-      ),
+          color: bgColor, borderRadius: BorderRadius.circular(6)),
+      child: Text(label,
+          style: TextStyle(
+              fontSize: 11, fontWeight: FontWeight.w600, color: textColor)),
     );
   }
 }
@@ -507,6 +480,10 @@ class _SubtaskPreview extends StatelessWidget {
     final theme = Theme.of(context);
     final visible = subtasks.take(3).toList();
     final remaining = subtasks.length - visible.length;
+
+    // Color del texto de subtareas completadas — mismo que usamos en decorationColor
+    // para que la línea de tachado no sea más luminosa que el propio texto.
+    final doneTextColor = theme.colorScheme.onSurface.withOpacity(0.3);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -528,52 +505,52 @@ class _SubtaskPreview extends StatelessWidget {
           blendMode: BlendMode.dstIn,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: visible
-                .map((s) => Padding(
-                      padding: const EdgeInsets.only(bottom: 2),
-                      child: Row(children: [
-                        Icon(
-                          s.isDone
-                              ? Icons.check_box_rounded
-                              : s.isPromoted
-                                  ? Icons.open_in_new_rounded
-                                  : Icons.check_box_outline_blank_rounded,
-                          size: 12,
-                          color: s.isDone
-                              ? theme.colorScheme.primary
-                              : s.isPromoted
-                                  ? theme.colorScheme.onSurface
-                                      .withOpacity(0.25)
-                                  : theme.colorScheme.onSurface
-                                      .withOpacity(0.4),
-                        ),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            s.title,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              fontSize: 11,
-                              color: s.isDone
-                                  ? theme.colorScheme.onSurface
-                                      .withOpacity(0.3)
-                                  : s.isPromoted
-                                      ? theme.colorScheme.onSurface
-                                          .withOpacity(0.25)
-                                      : theme.colorScheme.onSurface
-                                          .withOpacity(0.6),
-                              decoration: s.isDone
-                                  ? TextDecoration.lineThrough
-                                  : null,
-                              fontStyle:
-                                  s.isPromoted ? FontStyle.italic : null,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ]),
-                    ))
-                .toList(),
+            children: visible.map((s) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 2),
+                child: Row(children: [
+                  Icon(
+                    s.isDone
+                        ? Icons.check_box_rounded
+                        : s.isPromoted
+                            ? Icons.open_in_new_rounded
+                            : Icons.check_box_outline_blank_rounded,
+                    size: 12,
+                    color: s.isDone
+                        ? theme.colorScheme.primary.withOpacity(0.5)
+                        : s.isPromoted
+                            ? theme.colorScheme.onSurface.withOpacity(0.25)
+                            : theme.colorScheme.onSurface.withOpacity(0.4),
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      s.title,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontSize: 11,
+                        color: s.isDone
+                            ? doneTextColor
+                            : s.isPromoted
+                                ? theme.colorScheme.onSurface.withOpacity(0.25)
+                                : theme.colorScheme.onSurface.withOpacity(0.6),
+                        decoration:
+                            s.isDone ? TextDecoration.lineThrough : null,
+                        // ── FIX: misma opacidad que el texto ──────────────
+                        // Sin esto, Flutter calcula el decorationColor a partir
+                        // del color "base" del texto antes de aplicar opacity,
+                        // lo que en tema oscuro resulta en una línea demasiado
+                        // brillante dentro del ShaderMask.
+                        decorationColor: doneTextColor,
+                        decorationThickness: 1.5,
+                        fontStyle: s.isPromoted ? FontStyle.italic : null,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ]),
+              );
+            }).toList(),
           ),
         ),
         if (remaining > 0)
@@ -592,11 +569,7 @@ class _SubtaskPreview extends StatelessWidget {
 // ─── Checkbox animado ─────────────────────────────────────────────────────────
 
 class _AnimatedCheckbox extends StatelessWidget {
-  const _AnimatedCheckbox({
-    required this.isDone,
-    required this.priority,
-  });
-
+  const _AnimatedCheckbox({required this.isDone, required this.priority});
   final bool isDone;
   final Priority priority;
 
@@ -608,7 +581,6 @@ class _AnimatedCheckbox extends StatelessWidget {
       Priority.medium => BoardColors.medias,
       Priority.low    => theme.colorScheme.outline.withOpacity(0.5),
     };
-
     return AnimatedContainer(
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOut,
@@ -639,19 +611,16 @@ class _FrogBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: theme.colorScheme.primaryContainer,
-        borderRadius: BorderRadius.circular(6),
-      ),
+          color: theme.colorScheme.primaryContainer,
+          borderRadius: BorderRadius.circular(6)),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         const Text('🐸', style: TextStyle(fontSize: 10)),
         const SizedBox(width: 3),
-        Text(
-          'Come esto primero',
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: theme.colorScheme.primary,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
+        Text('Come esto primero',
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: theme.colorScheme.primary,
+              fontWeight: FontWeight.w600,
+            )),
       ]),
     );
   }
@@ -685,13 +654,11 @@ class _ScheduledBadge extends StatelessWidget {
         color: theme.colorScheme.tertiaryContainer.withOpacity(0.6),
         borderRadius: BorderRadius.circular(4),
       ),
-      child: Text(
-        label,
-        style: theme.textTheme.labelSmall?.copyWith(
-          fontSize: 10,
-          color: theme.colorScheme.tertiary,
-        ),
-      ),
+      child: Text(label,
+          style: theme.textTheme.labelSmall?.copyWith(
+            fontSize: 10,
+            color: theme.colorScheme.tertiary,
+          )),
     );
   }
 }

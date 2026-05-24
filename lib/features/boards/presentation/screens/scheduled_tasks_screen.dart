@@ -65,12 +65,10 @@ class ScheduledTasksScreen extends ConsumerWidget {
             Expanded(
               child: scheduledAsync.when(
                 loading: () =>
-                const Center(child: CircularProgressIndicator()),
+                    const Center(child: CircularProgressIndicator()),
                 error: (e, _) => Center(child: Text('Error: $e')),
                 data: (tasks) {
-                  if (tasks.isEmpty) {
-                    return _EmptyState();
-                  }
+                  if (tasks.isEmpty) return _EmptyState();
                   final grouped = _groupByDate(tasks);
                   final dates = grouped.keys.toList()..sort();
 
@@ -79,16 +77,12 @@ class ScheduledTasksScreen extends ConsumerWidget {
                     slivers: [
                       for (final date in dates) ...[
                         // Cabecera de fecha
-                        SliverToBoxAdapter(
-                          child: _DateHeader(date: date),
-                        ),
+                        SliverToBoxAdapter(child: _DateHeader(date: date)),
                         // Tareas de ese día
                         SliverList(
                           delegate: SliverChildBuilderDelegate(
-                                (context, index) {
-                              final task = grouped[date]![index];
-                              return _ScheduledTaskTile(task: task);
-                            },
+                            (context, index) => _ScheduledTaskTile(
+                                task: grouped[date]![index]),
                             childCount: grouped[date]!.length,
                           ),
                         ),
@@ -118,7 +112,7 @@ class ScheduledTasksScreen extends ConsumerWidget {
   }
 }
 
-// ─── Cabecera de fecha ─────────────────────────────────────────────────────────
+// ─── Cabecera de fecha ────────────────────────────────────────────────────────
 
 class _DateHeader extends StatelessWidget {
   const _DateHeader({required this.date});
@@ -144,9 +138,8 @@ class _DateHeader extends StatelessWidget {
       label = 'Vencido · ${DateFormat('d MMM', 'es').format(date)}';
       color = theme.colorScheme.error;
     } else {
-      label = DateFormat('EEEE, d MMM', 'es').format(date);
-      // Capitalizar primera letra
-      final capitalized = label[0].toUpperCase() + label.substring(1);
+      final raw = DateFormat('EEEE, d MMM', 'es').format(date);
+      final capitalized = raw[0].toUpperCase() + raw.substring(1);
       return _buildHeader(context, capitalized,
           theme.colorScheme.onSurface.withOpacity(0.5));
     }
@@ -158,32 +151,26 @@ class _DateHeader extends StatelessWidget {
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 6),
-      child: Row(
-        children: [
-          Container(
-            width: 3,
-            height: 14,
-            margin: const EdgeInsets.only(right: 8),
-            decoration: BoxDecoration(
-              color: color,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          Text(
-            label,
+      child: Row(children: [
+        Container(
+          width: 3,
+          height: 14,
+          margin: const EdgeInsets.only(right: 8),
+          decoration: BoxDecoration(
+              color: color, borderRadius: BorderRadius.circular(2)),
+        ),
+        Text(label,
             style: theme.textTheme.labelSmall?.copyWith(
               color: color,
               fontWeight: FontWeight.w600,
               letterSpacing: 0.3,
-            ),
-          ),
-        ],
-      ),
+            )),
+      ]),
     );
   }
 }
 
-// ─── Fila de tarea programada ──────────────────────────────────────────────────
+// ─── Fila de tarea programada ─────────────────────────────────────────────────
 
 class _ScheduledTaskTile extends ConsumerWidget {
   const _ScheduledTaskTile({required this.task});
@@ -208,104 +195,97 @@ class _ScheduledTaskTile extends ConsumerWidget {
             ),
           ),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          child: Row(
-            children: [
-              // ── Checkbox ──────────────────────────────────────────
-              GestureDetector(
-                onTap: () {
-                  HapticFeedback.selectionClick();
-                  actions.toggleDone(task.id, isDone: !task.isDone);
-                },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  width: 20,
-                  height: 20,
-                  decoration: BoxDecoration(
+          child: Row(children: [
+            // ── Checkbox ────────────────────────────────────────────────────
+            GestureDetector(
+              onTap: () {
+                HapticFeedback.selectionClick();
+                actions.toggleDone(task.id, isDone: !task.isDone);
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                width: 20,
+                height: 20,
+                decoration: BoxDecoration(
+                  color: task.isDone
+                      ? theme.colorScheme.primary
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
                     color: task.isDone
                         ? theme.colorScheme.primary
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(
-                      color: task.isDone
-                          ? theme.colorScheme.primary
-                          : theme.colorScheme.outline.withOpacity(0.5),
-                      width: 1.5,
-                    ),
+                        : theme.colorScheme.outline.withOpacity(0.5),
+                    width: 1.5,
                   ),
-                  child: task.isDone
-                      ? Icon(Icons.check_rounded,
-                      size: 13, color: theme.colorScheme.onPrimary)
-                      : null,
                 ),
+                child: task.isDone
+                    ? Icon(Icons.check_rounded,
+                        size: 13, color: theme.colorScheme.onPrimary)
+                    : null,
               ),
-              const SizedBox(width: 12),
+            ),
+            const SizedBox(width: 12),
 
-              // ── Contenido ─────────────────────────────────────────
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        if (task.isFrog) ...[
-                          const Text('🐸',
-                              style: TextStyle(fontSize: 12)),
-                          const SizedBox(width: 4),
-                        ],
-                        if (task.detectedKeyword != null) ...[
-                          Text(task.detectedKeyword!,
-                              style: const TextStyle(fontSize: 12)),
-                          const SizedBox(width: 4),
-                        ],
-                        Expanded(
-                          child: Text(
-                            task.title,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: task.isDone
-                                  ? theme.colorScheme.onSurface
-                                  .withOpacity(0.35)
-                                  : theme.colorScheme.onSurface,
-                              decoration: task.isDone
-                                  ? TextDecoration.lineThrough
-                                  : null,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+            // ── Contenido ───────────────────────────────────────────────────
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [
+                    if (task.isFrog) ...[
+                      const Text('🐸', style: TextStyle(fontSize: 12)),
+                      const SizedBox(width: 4),
+                    ],
+                    if (task.detectedKeyword != null) ...[
+                      Text(task.detectedKeyword!,
+                          style: const TextStyle(fontSize: 12)),
+                      const SizedBox(width: 4),
+                    ],
+                    Expanded(
+                      child: Text(
+                        task.title,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: task.isDone
+                              ? theme.colorScheme.onSurface.withOpacity(0.35)
+                              : theme.colorScheme.onSurface,
+                          decoration: task.isDone
+                              ? TextDecoration.lineThrough
+                              : null,
                         ),
-                      ],
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                    // Tablero de origen
-                    const SizedBox(height: 3),
-                    _BoardBadge(boardId: task.boardId),
-                  ],
-                ),
+                  ]),
+                  const SizedBox(height: 3),
+                  _BoardBadge(boardId: task.boardId),
+                ],
               ),
+            ),
 
-              // ── Cancelar programación ─────────────────────────────
-              GestureDetector(
-                onTap: () {
-                  HapticFeedback.selectionClick();
-                  actions.cancelSchedule(task.id);
-                },
-                child: Padding(
-                  padding: const EdgeInsets.only(left: 8),
-                  child: Icon(
-                    Icons.event_busy_rounded,
-                    size: 18,
-                    color: theme.colorScheme.onSurface.withOpacity(0.3),
-                  ),
+            // ── Cancelar programación — icono en rojo ────────────────────────
+            GestureDetector(
+              onTap: () {
+                HapticFeedback.selectionClick();
+                actions.cancelSchedule(task.id);
+              },
+              child: Padding(
+                padding: const EdgeInsets.only(left: 12),
+                child: Icon(
+                  Icons.event_busy_rounded,
+                  size: 20,
+                  color: theme.colorScheme.error.withOpacity(0.7),
                 ),
               ),
-            ],
-          ),
+            ),
+          ]),
         ),
       ),
     );
   }
 }
 
-// ─── Badge del tablero de origen ──────────────────────────────────────────────
+// ─── Badge del tablero de origen ─────────────────────────────────────────────
 
 class _BoardBadge extends ConsumerWidget {
   const _BoardBadge({required this.boardId});
@@ -324,20 +304,15 @@ class _BoardBadge extends ConsumerWidget {
     final info = _boardNames[boardId];
     if (info == null) return const SizedBox.shrink();
 
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(info.$2, style: const TextStyle(fontSize: 10)),
-        const SizedBox(width: 3),
-        Text(
-          info.$1,
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      Text(info.$2, style: const TextStyle(fontSize: 10)),
+      const SizedBox(width: 3),
+      Text(info.$1,
           style: theme.textTheme.labelSmall?.copyWith(
             fontSize: 10,
             color: theme.colorScheme.onSurface.withOpacity(0.4),
-          ),
-        ),
-      ],
-    );
+          )),
+    ]);
   }
 }
 
@@ -348,31 +323,22 @@ class _EmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.event_available_rounded,
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Icon(Icons.event_available_rounded,
             size: 48,
-            color: theme.colorScheme.onSurface.withOpacity(0.15),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Sin tareas programadas',
+            color: theme.colorScheme.onSurface.withOpacity(0.15)),
+        const SizedBox(height: 12),
+        Text('Sin tareas programadas',
             style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.colorScheme.onSurface.withOpacity(0.35),
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Programa una tarea desde el menú ⋮ de cualquier tarjeta',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurface.withOpacity(0.25),
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
+                color: theme.colorScheme.onSurface.withOpacity(0.35))),
+        const SizedBox(height: 6),
+        Text(
+          'Programa una tarea desde el menú ⋮ de cualquier tarjeta',
+          style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurface.withOpacity(0.25)),
+          textAlign: TextAlign.center,
+        ),
+      ]),
     );
   }
 }

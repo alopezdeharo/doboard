@@ -6,8 +6,11 @@ import '../tables/tasks_table.dart';
 part 'tasks_dao.g.dart';
 
 /// Boards cuyas tareas nuevas se insertan al principio (posición mínima - 1).
-/// El resto de boards insertan al final (posición máxima + 1).
 const _topInsertBoards = {'board-hoy'};
+
+/// Al mover una tarea a Hoy la programación se cancela (ya está «hoy»).
+/// En cualquier otro destino la programación se preserva.
+const _clearScheduleOnMoveBoards = {'board-hoy'};
 
 @DriftAccessor(tables: [Tasks])
 class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
@@ -17,9 +20,9 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
     return (select(tasks)
       ..where((t) => t.boardId.equals(boardId))
       ..orderBy([
-            (t) => OrderingTerm.desc(t.isPinned),
-            (t) => OrderingTerm.desc(t.isFrog),
-            (t) => OrderingTerm.asc(t.position),
+        (t) => OrderingTerm.desc(t.isPinned),
+        (t) => OrderingTerm.desc(t.isFrog),
+        (t) => OrderingTerm.asc(t.position),
       ]))
         .watch();
   }
@@ -28,17 +31,16 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
     return (select(tasks)
       ..where((t) => t.boardId.equals(boardId) & t.isDone.equals(false))
       ..orderBy([
-            (t) => OrderingTerm.desc(t.isPinned),
-            (t) => OrderingTerm.desc(t.isFrog),
-            (t) => OrderingTerm.asc(t.position),
+        (t) => OrderingTerm.desc(t.isPinned),
+        (t) => OrderingTerm.desc(t.isFrog),
+        (t) => OrderingTerm.asc(t.position),
       ]))
         .watch();
   }
 
   Stream<List<TaskData>> watchScheduledTasks() {
     return (select(tasks)
-      ..where((t) =>
-      t.scheduledDate.isNotNull() & t.isDone.equals(false))
+      ..where((t) => t.scheduledDate.isNotNull() & t.isDone.equals(false))
       ..orderBy([(t) => OrderingTerm.asc(t.scheduledDate)]))
         .watch();
   }
@@ -118,13 +120,24 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
     );
   }
 
-  Future<void> moveToBoard(String taskId, String targetBoardId, int position) {
+  /// Mueve la tarea al tablero destino.
+  ///
+  /// - `scheduledDate` se preserva salvo que el destino sea `board-hoy`,
+  ///   donde la programación ya no tiene sentido (la tarea ya está «hoy»).
+  /// - `isFrog` se resetea siempre: la rana es contexto del tablero origen.
+  Future<void> moveToBoard(
+      String taskId, String targetBoardId, int position) {
+    final clearSchedule =
+        _clearScheduleOnMoveBoards.contains(targetBoardId);
+
     return (update(tasks)..where((t) => t.id.equals(taskId))).write(
       TasksCompanion(
         boardId: Value(targetBoardId),
         isFrog: const Value(false),
         position: Value(position),
-        scheduledDate: const Value(null),
+        // Solo borramos scheduledDate si el destino es Hoy
+        scheduledDate:
+            clearSchedule ? const Value(null) : const Value.absent(),
         updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
       ),
     );
@@ -156,7 +169,8 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
     await transaction(() async {
       for (final entry in positions.entries) {
         await (update(tasks)..where((t) => t.id.equals(entry.key))).write(
-          TasksCompanion(position: Value(entry.value), updatedAt: Value(now)),
+          TasksCompanion(
+              position: Value(entry.value), updatedAt: Value(now)),
         );
       }
     });
@@ -164,7 +178,8 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
 
   Future<int> clearCompleted(String boardId) {
     return (delete(tasks)
-      ..where((t) => t.boardId.equals(boardId) & t.isDone.equals(true)))
+          ..where(
+              (t) => t.boardId.equals(boardId) & t.isDone.equals(true)))
         .go();
   }
 
@@ -193,12 +208,12 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
   Future<int> moveScheduledTasksToToday(
       String todayBoardId, int nowMs) async {
     final due = await (select(tasks)
-      ..where((t) =>
-      t.scheduledDate.isNotNull() &
-      t.scheduledDate.isSmallerOrEqualValue(nowMs) &
-      t.boardId.isNotValue(todayBoardId) &
-      t.isDone.equals(false))
-      ..orderBy([(t) => OrderingTerm.asc(t.scheduledDate)]))
+          ..where((t) =>
+              t.scheduledDate.isNotNull() &
+              t.scheduledDate.isSmallerOrEqualValue(nowMs) &
+              t.boardId.isNotValue(todayBoardId) &
+              t.isDone.equals(false))
+          ..orderBy([(t) => OrderingTerm.asc(t.scheduledDate)]))
         .get();
 
     if (due.isEmpty) return 0;

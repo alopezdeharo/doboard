@@ -7,8 +7,10 @@ abstract interface class ITaskRepository {
   Stream<List<Task>> watchPendingTasksByBoard(String boardId);
   Stream<Task?> watchTaskById(String id);
   Future<Task?> getTaskById(String id);
-
   Stream<List<Task>> watchScheduledTasks();
+
+  /// Stream de la tarea marcada como rana. Null si no existe ninguna.
+  Stream<Task?> watchFrogTask();
 
   Future<void> createTask({
     required String id,
@@ -23,16 +25,13 @@ abstract interface class ITaskRepository {
   Future<void> updateTask(Task task);
   Future<void> deleteTask(String id);
   Future<void> toggleDone(String id, {required bool isDone});
-
   Future<void> moveToBoard(String taskId, String targetBoardId);
-
   Future<void> setFrog(String taskId, String boardId);
   Future<void> removeFrog(String taskId);
   Future<void> reorderTasks(String boardId, List<String> orderedIds);
   Future<void> clearCompleted(String boardId);
   Future<int> countPendingByBoard(String boardId);
   Future<void> duplicateTask(String taskId);
-
   Future<void> syncPromotedSubtaskDone(String taskId, {required bool isDone});
   Future<void> scheduleTask(String taskId, DateTime date);
   Future<void> cancelSchedule(String taskId);
@@ -48,7 +47,6 @@ abstract interface class ITaskRepository {
 
   /// UPDATE parcial: solo actualiza el título, preserva isDone/position/etc.
   Future<void> updateSubtaskTitle(String subtaskId, String newTitle);
-
   Future<void> toggleSubtaskDone(String id, {required bool isDone});
   Future<void> deleteSubtask(String id);
   Future<void> reorderSubtasks(String taskId, List<String> orderedIds);

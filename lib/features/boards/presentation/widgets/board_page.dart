@@ -10,8 +10,8 @@ import '../../../tasks/domain/entities/task.dart';
 import '../../../tasks/presentation/providers/tasks_provider.dart';
 import '../../../tasks/presentation/widgets/task_card.dart';
 import '../../../tasks/presentation/widgets/task_card_draggable.dart';
-
 // ─── BoardPage ────────────────────────────────────────────────────────────────
+const _kHoyBoardId = 'board-hoy';
 
 class BoardPage extends ConsumerWidget {
   const BoardPage({
@@ -67,9 +67,10 @@ class _TaskListState extends ConsumerState<_TaskList> {
 
   /// IDs que están ejecutando su animación de salida (collapse).
   final Set<String> _collapsingIds = {};
-
   Timer? _moveTimer;
   bool _completedExpanded = false;
+
+  bool get _isHoy => widget.board.id == _kHoyBoardId;
 
   @override
   void initState() {
@@ -122,6 +123,15 @@ class _TaskListState extends ConsumerState<_TaskList> {
         pending.add(t);
       } else {
         completed.add(t);
+      }
+    }
+
+    // En Hoy: la rana siempre primera, sin importar el orden del backend.
+    if (_isHoy) {
+      final frogIndex = pending.indexWhere((t) => t.isFrog);
+      if (frogIndex > 0) {
+        final frog = pending.removeAt(frogIndex);
+        pending.insert(0, frog);
       }
     }
 
@@ -190,20 +200,16 @@ class _TaskListState extends ConsumerState<_TaskList> {
   /// Fase 1: añadir a _collapsingIds → AnimatedSize colapsa la tarjeta.
   void _startCollapseAnimation() {
     if (!mounted || _pendingMoveIds.isEmpty) return;
-    setState(() {
-      _collapsingIds.addAll(_pendingMoveIds);
-    });
-    // Fase 2: tras la animación, mover a completadas.
+    setState(() => _collapsingIds.addAll(_pendingMoveIds));
+
     Future.delayed(const Duration(milliseconds: 350), _flushCompleted);
   }
 
   /// Fase 2: mover de _pending → _completed.
   void _flushCompleted() {
     if (!mounted || _collapsingIds.isEmpty) return;
-
     final toFlush =
         _pending.where((t) => _collapsingIds.contains(t.id)).toList();
-
     setState(() {
       _pending.removeWhere((t) => _collapsingIds.contains(t.id));
       for (final task in toFlush) {
@@ -218,10 +224,22 @@ class _TaskListState extends ConsumerState<_TaskList> {
 
   void _onReorder(int oldIndex, int newIndex) {
     if (newIndex > oldIndex) newIndex--;
+
+    // ── Rana bloqueada en Hoy ───────────────────────────────────────────────
+    // La rana (índice 0 si existe) no se puede mover, y nadie puede
+    // colocarse por encima de ella.
+    if (_isHoy && _pending.isNotEmpty && _pending.first.isFrog) {
+      // No permitir mover la rana
+      if (oldIndex == 0) return;
+      // No permitir mover nada a posición 0 (por encima de la rana)
+      if (newIndex == 0) newIndex = 1;
+    }
+
     setState(() {
       final item = _pending.removeAt(oldIndex);
       _pending.insert(newIndex, item);
     });
+
     ref.read(taskActionsProvider.notifier).reorderTasks(
           widget.board.id,
           _pending.map((t) => t.id).toList(),
@@ -261,24 +279,38 @@ class _TaskListState extends ConsumerState<_TaskList> {
         final task = _pending[index];
         final isCollapsing = _collapsingIds.contains(task.id);
 
+        // ── Rana en Hoy: no arrastrable, siempre en posición 0 ─────────────
+        final isFrogLocked = _isHoy && task.isFrog;
+
+        final cardWidget = _AnimatedTaskSlot(
+          isCollapsing: isCollapsing,
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: TaskCardDraggable(
+              key: ValueKey(
+                '${task.id}_${task.isDone}_${task.priority.value}_${task.title.hashCode}',
+              ),
+              task: task,
+              boardId: widget.board.id,
+              index: index,
+              onToggleDone: (isDone) => _handleToggle(task.id, isDone),
+            ),
+          ),
+        );
+
+        if (isFrogLocked) {
+          // KeyedSubtree mantiene la key que necesita ReorderableListView
+          // pero sin el listener de arrastre — la tarjeta queda bloqueada.
+          return KeyedSubtree(
+            key: ValueKey(task.id),
+            child: cardWidget,
+          );
+        }
+
         return ReorderableDelayedDragStartListener(
           key: ValueKey(task.id),
           index: index,
-          child: _AnimatedTaskSlot(
-            isCollapsing: isCollapsing,
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: TaskCardDraggable(
-                key: ValueKey(
-                  '${task.id}_${task.isDone}_${task.priority.value}_${task.title.hashCode}',
-                ),
-                task: task,
-                boardId: widget.board.id,
-                index: index,
-                onToggleDone: (isDone) => _handleToggle(task.id, isDone),
-              ),
-            ),
-          ),
+          child: cardWidget,
         );
       },
     );
@@ -423,7 +455,8 @@ class _CompletedHeader extends StatelessWidget {
             ),
             const SizedBox(width: 6),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
               decoration: BoxDecoration(
                 color: theme.colorScheme.onSurface.withOpacity(0.08),
                 borderRadius: BorderRadius.circular(20),

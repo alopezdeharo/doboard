@@ -45,6 +45,15 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
         .watch();
   }
 
+  /// Stream de la tarea marcada como rana (si existe).
+  /// Siempre emite un único resultado o null — la rana es global y única.
+  Stream<TaskData?> watchFrogTask() {
+    return (select(tasks)
+      ..where((t) => t.isFrog.equals(true) & t.isDone.equals(false))
+      ..limit(1))
+        .watchSingleOrNull();
+  }
+
   Future<TaskData?> getTaskById(String id) {
     return (select(tasks)..where((t) => t.id.equals(id))).getSingleOrNull();
   }
@@ -114,28 +123,22 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
     return (update(tasks)..where((t) => t.id.equals(id))).write(
       TasksCompanion(
         isDone: Value(isDone),
+        // Al completar la tarea quitamos la rana también
+        isFrog: isDone ? const Value(false) : const Value.absent(),
         completedAt: Value(isDone ? now : null),
         updatedAt: Value(now),
       ),
     );
   }
 
-  /// Mueve la tarea al tablero destino.
-  ///
-  /// - `scheduledDate` se preserva salvo que el destino sea `board-hoy`,
-  ///   donde la programación ya no tiene sentido (la tarea ya está «hoy»).
-  /// - `isFrog` se resetea siempre: la rana es contexto del tablero origen.
   Future<void> moveToBoard(
       String taskId, String targetBoardId, int position) {
-    final clearSchedule =
-        _clearScheduleOnMoveBoards.contains(targetBoardId);
-
+    final clearSchedule = _clearScheduleOnMoveBoards.contains(targetBoardId);
     return (update(tasks)..where((t) => t.id.equals(taskId))).write(
       TasksCompanion(
         boardId: Value(targetBoardId),
-        isFrog: const Value(false),
+        // La rana viaja con la tarea — NO se quita al mover
         position: Value(position),
-        // Solo borramos scheduledDate si el destino es Hoy
         scheduledDate:
             clearSchedule ? const Value(null) : const Value.absent(),
         updatedAt: Value(DateTime.now().millisecondsSinceEpoch),
@@ -143,12 +146,17 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
     );
   }
 
-  Future<void> setFrog(String taskId, String boardId) async {
+  /// Marca una tarea como rana.
+  /// Primero quita la rana de CUALQUIER tarea en TODA la app (rana global única),
+  /// luego la asigna a la tarea indicada.
+  Future<void> setFrog(String taskId) async {
     final now = DateTime.now().millisecondsSinceEpoch;
     await transaction(() async {
-      await (update(tasks)..where((t) => t.boardId.equals(boardId))).write(
+      // Quitar rana global
+      await (update(tasks)..where((t) => t.isFrog.equals(true))).write(
         TasksCompanion(isFrog: const Value(false), updatedAt: Value(now)),
       );
+      // Asignar rana a la nueva tarea
       await (update(tasks)..where((t) => t.id.equals(taskId))).write(
         TasksCompanion(isFrog: const Value(true), updatedAt: Value(now)),
       );
@@ -193,6 +201,7 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
       priority: Value(original.priority),
       position: Value(original.position + 1),
       isDone: const Value(false),
+      // El duplicado nunca hereda la rana
       isFrog: const Value(false),
       isPinned: const Value(false),
       detectedKeyword: Value(original.detectedKeyword),
@@ -224,12 +233,11 @@ class TasksDao extends DatabaseAccessor<AppDatabase> with _$TasksDaoMixin {
 
     await transaction(() async {
       for (var i = 0; i < due.length; i++) {
-        final newPosition = minPos - (due.length - i);
         await (update(tasks)..where((t) => t.id.equals(due[i].id))).write(
           TasksCompanion(
             boardId: Value(todayBoardId),
             scheduledDate: const Value(null),
-            position: Value(newPosition),
+            position: Value(minPos - (due.length - i)),
             updatedAt: Value(nowMs),
           ),
         );

@@ -24,14 +24,17 @@ class TaskRepositoryImpl implements ITaskRepository {
       .map((rows) => rows.map((r) => r.toTask()).toList());
 
   @override
-  Stream<Task?> watchTaskById(String id) => _db.tasksDao
-      .watchTaskById(id)
-      .map((row) => row?.toTask());
+  Stream<Task?> watchTaskById(String id) =>
+      _db.tasksDao.watchTaskById(id).map((row) => row?.toTask());
 
   @override
   Stream<List<Task>> watchScheduledTasks() => _db.tasksDao
       .watchScheduledTasks()
       .map((rows) => rows.map((r) => r.toTask()).toList());
+
+  @override
+  Stream<Task?> watchFrogTask() =>
+      _db.tasksDao.watchFrogTask().map((row) => row?.toTask());
 
   @override
   Future<Task?> getTaskById(String id) async {
@@ -84,12 +87,10 @@ class TaskRepositoryImpl implements ITaskRepository {
       {required bool isDone}) async {
     final task = await _db.tasksDao.getTaskById(taskId);
     if (task == null || task.parentTaskTitle == null) return;
-
     final parents = await (_db.select(_db.tasks)
           ..where((t) => t.title.equals(task.parentTaskTitle!)))
         .get();
     if (parents.isEmpty) return;
-
     for (final parent in parents) {
       final subs = await (_db.select(_db.subtasks)
             ..where((s) =>
@@ -111,8 +112,9 @@ class TaskRepositoryImpl implements ITaskRepository {
   }
 
   @override
+  // boardId ya no es necesario — la rana es global
   Future<void> setFrog(String taskId, String boardId) =>
-      _db.tasksDao.setFrog(taskId, boardId);
+      _db.tasksDao.setFrog(taskId);
 
   @override
   Future<void> removeFrog(String taskId) => _db.tasksDao.removeFrog(taskId);
@@ -242,17 +244,14 @@ class TaskRepositoryImpl implements ITaskRepository {
     final subtasks = await _db.subtasksDao.getSubtasksByTask(parentTaskId);
     final subtask = subtasks.where((s) => s.id == subtaskId).firstOrNull;
     if (subtask == null) return;
-
     final parentData = await _db.tasksDao.getTaskById(parentTaskId);
     final parentTitle = parentData?.title;
     final now = DateTime.now().millisecondsSinceEpoch;
     final position = await _db.tasksDao.nextInsertPosition(targetBoardId);
-
     await _db.transaction(() async {
       await ((_db.update(_db.subtasks))
             ..where((s) => s.id.equals(subtaskId)))
           .write(const SubtasksCompanion(isPromoted: Value(true)));
-
       await _db.tasksDao.insertTask(TasksCompanion(
         id: Value(_uuid.v4()),
         boardId: Value(targetBoardId),

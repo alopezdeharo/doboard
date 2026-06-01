@@ -10,7 +10,7 @@ class AppSettings {
     this.inputPosition = InputPosition.bottom,
     this.baseFontSize = 14.0,
     this.automationsEnabled = true,
-    this.frogEnabled = true,
+    this.frogEnabled = false, // Eat The Frog desactivado por defecto
     this.expressTimerEnabled = true,
     this.showCompletedTasks = false,
     this.themeMode = AppThemeMode.system,
@@ -25,35 +25,39 @@ class AppSettings {
   final AppThemeMode themeMode;
 
   AppSettings copyWith({
-    InputPosition? inputPosition, double? baseFontSize,
-    bool? automationsEnabled, bool? frogEnabled,
-    bool? expressTimerEnabled, bool? showCompletedTasks,
+    InputPosition? inputPosition,
+    double? baseFontSize,
+    bool? automationsEnabled,
+    bool? frogEnabled,
+    bool? expressTimerEnabled,
+    bool? showCompletedTasks,
     AppThemeMode? themeMode,
-  }) => AppSettings(
-    inputPosition: inputPosition ?? this.inputPosition,
-    baseFontSize: baseFontSize ?? this.baseFontSize,
-    automationsEnabled: automationsEnabled ?? this.automationsEnabled,
-    frogEnabled: frogEnabled ?? this.frogEnabled,
-    expressTimerEnabled: expressTimerEnabled ?? this.expressTimerEnabled,
-    showCompletedTasks: showCompletedTasks ?? this.showCompletedTasks,
-    themeMode: themeMode ?? this.themeMode,
-  );
+  }) =>
+      AppSettings(
+        inputPosition: inputPosition ?? this.inputPosition,
+        baseFontSize: baseFontSize ?? this.baseFontSize,
+        automationsEnabled: automationsEnabled ?? this.automationsEnabled,
+        frogEnabled: frogEnabled ?? this.frogEnabled,
+        expressTimerEnabled: expressTimerEnabled ?? this.expressTimerEnabled,
+        showCompletedTasks: showCompletedTasks ?? this.showCompletedTasks,
+        themeMode: themeMode ?? this.themeMode,
+      );
 
   /// Convierte el enum propio al ThemeMode de Flutter.
   ThemeMode get flutterThemeMode => switch (themeMode) {
-    AppThemeMode.light  => ThemeMode.light,
-    AppThemeMode.dark   => ThemeMode.dark,
-    AppThemeMode.system => ThemeMode.system,
-  };
+        AppThemeMode.light => ThemeMode.light,
+        AppThemeMode.dark => ThemeMode.dark,
+        AppThemeMode.system => ThemeMode.system,
+      };
 }
 
 const _kInputPosition = 'input_position';
-const _kFontSize      = 'font_size';
-const _kAutomations   = 'automations_enabled';
-const _kFrog          = 'frog_enabled';
-const _kTimer         = 'timer_enabled';
+const _kFontSize = 'font_size';
+const _kAutomations = 'automations_enabled';
+const _kFrog = 'frog_enabled';
+const _kTimer = 'timer_enabled';
 const _kShowCompleted = 'show_completed';
-const _kThemeMode     = 'theme_mode';
+const _kThemeMode = 'theme_mode';
 
 class SettingsNotifier extends AsyncNotifier<AppSettings> {
   late SharedPreferences _prefs;
@@ -65,15 +69,16 @@ class SettingsNotifier extends AsyncNotifier<AppSettings> {
   }
 
   AppSettings _load() => AppSettings(
-    inputPosition: InputPosition.values[_prefs.getInt(_kInputPosition) ?? 1],
-    baseFontSize: _prefs.getDouble(_kFontSize) ?? 14.0,
-    automationsEnabled: _prefs.getBool(_kAutomations) ?? true,
-    frogEnabled: _prefs.getBool(_kFrog) ?? true,
-    expressTimerEnabled: _prefs.getBool(_kTimer) ?? true,
-    showCompletedTasks: _prefs.getBool(_kShowCompleted) ?? false,
-    // Por defecto system → respeta el modo del móvil
-    themeMode: AppThemeMode.values[_prefs.getInt(_kThemeMode) ?? 2],
-  );
+        inputPosition:
+            InputPosition.values[_prefs.getInt(_kInputPosition) ?? 1],
+        baseFontSize: _prefs.getDouble(_kFontSize) ?? 14.0,
+        automationsEnabled: _prefs.getBool(_kAutomations) ?? true,
+        frogEnabled: _prefs.getBool(_kFrog) ?? false, // false por defecto
+        expressTimerEnabled: _prefs.getBool(_kTimer) ?? true,
+        showCompletedTasks: _prefs.getBool(_kShowCompleted) ?? false,
+        // Por defecto system → respeta el modo del móvil
+        themeMode: AppThemeMode.values[_prefs.getInt(_kThemeMode) ?? 2],
+      );
 
   Future<void> setInputPosition(InputPosition pos) async {
     await _prefs.setInt(_kInputPosition, pos.index);
@@ -110,4 +115,4 @@ class SettingsNotifier extends AsyncNotifier<AppSettings> {
 }
 
 final settingsProvider =
-AsyncNotifierProvider<SettingsNotifier, AppSettings>(SettingsNotifier.new);
+    AsyncNotifierProvider<SettingsNotifier, AppSettings>(SettingsNotifier.new);

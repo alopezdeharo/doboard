@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../domain/entities/subtask.dart';
 import '../providers/tasks_provider.dart';
+import '../../../../features/boards/presentation/providers/boards_provider.dart';
+import '../../../../features/boards/domain/entities/board.dart';
 
 const _kMaxLength = 200;
 const _kWarnAt    = 150;
@@ -30,13 +32,14 @@ class _SubtaskItemState extends ConsumerState<SubtaskItem> {
   late final TextEditingController _ctrl;
   // Guardamos la referencia al notifier en initState para poder usarla
   // en dispose() de forma segura — ref.read() no está soportado en dispose().
-  late final TaskActionsNotifier _actions;
+
+  late final TaskActionsNotifier   _actions;
 
   @override
   void initState() {
     super.initState();
-    _ctrl    = TextEditingController(text: widget.subtask.title);
-    _actions = ref.read(taskActionsProvider.notifier);
+    _ctrl      = TextEditingController(text: widget.subtask.title);
+    _actions   = ref.read(taskActionsProvider.notifier);
     _charCount = widget.subtask.title.length;
     _ctrl.addListener(() {
       if (mounted) setState(() => _charCount = _ctrl.text.length);
@@ -65,6 +68,32 @@ class _SubtaskItemState extends ConsumerState<SubtaskItem> {
       _ctrl.text = widget.subtask.title; // revert si estaba vacío
     }
     setState(() => _isEditing = false);
+  }
+
+  Future<void> _showPromoteSheet() async {
+    final boards = ref.read(visibleBoardsProvider).valueOrNull ?? [];
+    if (boards.isEmpty) return;
+
+    final picked = await showModalBottomSheet<Board>(
+      context: context,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => _PromoteBoardSheet(
+        boards: boards,
+        currentBoardId: widget.boardId,
+        subtaskTitle: widget.subtask.title,
+      ),
+    );
+
+    if (picked == null) return;
+
+    _actions.promoteSubtask(
+      subtaskId:     widget.subtask.id,
+      parentTaskId:  widget.taskId,
+      targetBoardId: picked.id,
+    );
   }
 
   @override
@@ -105,7 +134,7 @@ class _SubtaskItemState extends ConsumerState<SubtaskItem> {
           children: [
             Row(
               children: [
-                // ── Checkbox ───────────────────────────────────────────────
+                // ── Checkbox ──────────────────────────────────────────────
                 GestureDetector(
                   onTap: isPromoted
                       ? null
@@ -137,11 +166,12 @@ class _SubtaskItemState extends ConsumerState<SubtaskItem> {
                     child: isPromoted
                         ? Icon(Icons.open_in_new_rounded,
                             size: 10,
-                            color:
-                                theme.colorScheme.onSurface.withOpacity(0.25))
+                            color: theme.colorScheme.onSurface
+                                .withOpacity(0.25))
                         : subtask.isDone
                             ? Icon(Icons.check_rounded,
-                                size: 11, color: theme.colorScheme.onPrimary)
+                                size: 11,
+                                color: theme.colorScheme.onPrimary)
                             : null,
                   ),
                 ),
@@ -156,8 +186,7 @@ class _SubtaskItemState extends ConsumerState<SubtaskItem> {
                           maxLength: _kMaxLength,
                           maxLines: null,
                           buildCounter: (_, {required currentLength,
-                                required isFocused, maxLength}) =>
-                              null, // ocultamos el counter nativo de TextField
+                                required isFocused, maxLength}) => null,
                           onSubmitted: (_) => _save(),
                           onTapOutside: (_) => _save(),
                           style: theme.textTheme.bodyMedium,
@@ -172,8 +201,7 @@ class _SubtaskItemState extends ConsumerState<SubtaskItem> {
                               ? null
                               : () => setState(() {
                                     _isEditing = true;
-                                    _charCount =
-                                        widget.subtask.title.length;
+                                    _charCount = widget.subtask.title.length;
                                   }),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -231,14 +259,10 @@ class _SubtaskItemState extends ConsumerState<SubtaskItem> {
                     ),
                   ),
 
-                // ── Botón promover (oculto mientras se edita) ───────────────
+                // ── Botón promover → abre selector de tablero ─────────────
                 if (!isPromoted && !_isEditing)
                   GestureDetector(
-                    onTap: () => _actions.promoteSubtask(
-                      subtaskId: subtask.id,
-                      parentTaskId: widget.taskId,
-                      targetBoardId: widget.boardId,
-                    ),
+                    onTap: _showPromoteSheet,
                     child: Padding(
                       padding: const EdgeInsets.all(6),
                       child: Icon(
@@ -250,6 +274,146 @@ class _SubtaskItemState extends ConsumerState<SubtaskItem> {
                   ),
               ],
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Bottom sheet de selección de tablero ─────────────────────────────────────
+
+class _PromoteBoardSheet extends StatelessWidget {
+  const _PromoteBoardSheet({
+    required this.boards,
+    required this.currentBoardId,
+    required this.subtaskTitle,
+  });
+
+  final List<Board> boards;
+  final String currentBoardId;
+  final String subtaskTitle;
+
+  static const _boardColors = {
+    'board-hoy':     Color(0xFF4DB87A),
+    'board-rapidas': Color(0xFFEFAA27),
+    'board-calma':   Color(0xFF4DB87A),
+    'board-prisa':   Color(0xFF5B7FD4),
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    // Hoy siempre arriba, luego el resto excepto el tablero actual
+    final sorted = [
+      ...boards.where((b) => b.id == 'board-hoy'),
+      ...boards.where((b) => b.id != 'board-hoy' && b.id != currentBoardId),
+    ];
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Handle ────────────────────────────────────────────────────
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.onSurface.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+
+            // ── Título ────────────────────────────────────────────────────
+            Text(
+              'Enviar la siguiente subtarea a un tablero',
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '"$subtaskTitle"',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurface.withOpacity(0.5),
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 16),
+
+            // ── Opciones de tablero ───────────────────────────────────────
+            ...sorted.map((board) {
+              final color = _boardColors[board.id] ??
+                  theme.colorScheme.primary;
+              final isHoy = board.id == 'board-hoy';
+
+              return InkWell(
+                onTap: () => Navigator.pop(context, board),
+                borderRadius: BorderRadius.circular(12),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                      vertical: 12, horizontal: 4),
+                  child: Row(children: [
+                    // Dot de color
+                    Container(
+                      width: 10,
+                      height: 10,
+                      margin: const EdgeInsets.only(right: 12),
+                      decoration: BoxDecoration(
+                        color: color,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    Text(
+                      board.emoji,
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        board.name,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: isHoy
+                              ? FontWeight.w600
+                              : FontWeight.w400,
+                        ),
+                      ),
+                    ),
+                    if (isHoy)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: color.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          'hoy',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: color,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      size: 18,
+                      color: theme.colorScheme.onSurface.withOpacity(0.25),
+                    ),
+                  ]),
+                ),
+              );
+            }),
           ],
         ),
       ),

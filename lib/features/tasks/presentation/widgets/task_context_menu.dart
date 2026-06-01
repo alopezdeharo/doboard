@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 
 import '../../domain/entities/task.dart';
 import '../providers/tasks_provider.dart';
+import '../providers/frog_provider.dart';
 import '../../../../features/boards/presentation/providers/boards_provider.dart';
 import '../../../../features/settings/domain/entities/app_settings.dart';
 import '../../../../core/services/notification_service.dart';
@@ -29,9 +30,9 @@ class TaskContextMenu extends ConsumerWidget {
 
     // Leer si Eat the Frog está habilitado
     final frogEnabled = ref.watch(settingsProvider).maybeWhen(
-      data: (s) => s.frogEnabled,
-      orElse: () => true,
-    );
+          data: (s) => s.frogEnabled,
+          orElse: () => false,
+        );
 
     final otherBoards = boardsAsync.maybeWhen(
       data: (boards) => boards.where((b) => b.id != boardId).toList(),
@@ -150,15 +151,16 @@ class TaskContextMenu extends ConsumerWidget {
               emoji: '🐸',
               label: task.isFrog ? 'Quitar rana' : 'Marcar como rana',
               onTap: () {
-                task.isFrog
-                    ? actions.removeFrog(task.id)
-                    : actions.setFrog(task.id, boardId);
                 onClose();
+                if (task.isFrog) {
+                  actions.removeFrog(task.id);
+                } else {
+                  _setFrogWithFeedback(context, ref, actions, task);
+                }
               },
             ),
             _Divider(),
           ],
-
           _MenuItem(
             icon: Icons.copy_rounded,
             label: 'Duplicar',
@@ -178,6 +180,49 @@ class TaskContextMenu extends ConsumerWidget {
             },
           ),
         ],
+      ),
+    );
+  }
+
+  void _setFrogWithFeedback(
+    BuildContext context,
+    WidgetRef ref,
+    TaskActionsNotifier actions,
+    Task newFrog,
+  ) {
+    final previousFrog = ref.read(frogTaskProvider).valueOrNull;
+    actions.setFrog(newFrog.id, boardId);
+
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(children: [
+          const Text('🐸', style: TextStyle(fontSize: 14)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Rana cambiada a "${newFrog.title}"',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 13),
+            ),
+          ),
+        ]),
+        // 3 segundos y desaparece solo
+        duration: const Duration(seconds: 3),
+        behavior: SnackBarBehavior.floating,
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        action: SnackBarAction(
+          label: 'Deshacer',
+          onPressed: () {
+            if (previousFrog != null) {
+              actions.setFrog(previousFrog.id, previousFrog.boardId);
+            } else {
+              actions.removeFrog(newFrog.id);
+            }
+          },
+        ),
       ),
     );
   }

@@ -18,6 +18,7 @@ import '../widgets/subtask_item.dart';
 // Límite compartido con SubtaskItem y la BD (subtasks_table: max: 200)
 const _kSubtaskMaxLength = 200;
 const _kSubtaskWarnAt    = 150;
+const _kMaxSubtasks      = 20;
 
 class TaskDetailScreen extends ConsumerWidget {
   const TaskDetailScreen({super.key, required this.taskId});
@@ -467,15 +468,28 @@ class _SubtaskSection extends HookConsumerWidget {
   const _SubtaskSection({required this.task});
   final Task task;
 
+  // Parsea un sufijo xN al final del texto.
+  // "dedicar 30 min x3" → ('dedicar 30 min', 3)
+  // "tarea"             → ('tarea', 1)
+  // "x3"               → ('x3', 1)  ← sin título base, se trata como literal
+  static ({String title, int repeat}) _parseXn(String raw) {
+    final match = RegExp(r'^(.*?)\s*[xX](\d+)$').firstMatch(raw);
+    if (match == null) return (title: raw, repeat: 1);
+    final base   = match.group(1)!.trim();
+    final n      = int.tryParse(match.group(2)!) ?? 1;
+    if (base.isEmpty || n <= 1) return (title: raw, repeat: 1);
+    return (title: base, repeat: n);
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme      = Theme.of(context);
+    final theme       = Theme.of(context);
     final isCollapsed = useState(false);
-    final isAdding   = useState(false);
-    final charCount  = useState(0);
-    final inputCtrl  = useTextEditingController();
+    final isAdding    = useState(false);
+    final charCount   = useState(0);
+    final inputCtrl   = useTextEditingController();
     final subtasksAsync = ref.watch(subtasksByTaskProvider(task.id));
-    final actions    = ref.read(taskActionsProvider.notifier);
+    final actions     = ref.read(taskActionsProvider.notifier);
 
     // Actualizar contador al escribir
     useEffect(() {
@@ -485,16 +499,42 @@ class _SubtaskSection extends HookConsumerWidget {
     }, [inputCtrl]);
 
     Future<void> addSubtask() async {
-      // Truncamos por si acaso, aunque maxLength ya lo impide en el TextField
-      final title = inputCtrl.text.trim();
-      final safe  = title.length > _kSubtaskMaxLength
-          ? title.substring(0, _kSubtaskMaxLength)
-          : title;
-      if (safe.isEmpty) {
+      final raw = inputCtrl.text.trim();
+      if (raw.isEmpty) {
         isAdding.value = false;
         return;
       }
-      await actions.createSubtask(taskId: task.id, title: safe);
+
+      // Detectar sufijo xN  →  "dedicar 30 min x3" : title="dedicar 30 min", repeat=3
+      final parsed    = _parseXn(raw);
+      final baseTitle = parsed.title.length > _kSubtaskMaxLength
+          ? parsed.title.substring(0, _kSubtaskMaxLength)
+          : parsed.title;
+      final repeat    = parsed.repeat;
+
+      // Comprobar límite
+      final currentCount = subtasksAsync.valueOrNull?.length ?? 0;
+      final available    = _kMaxSubtasks - currentCount;
+
+      if (repeat > available) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(
+            content: Text(
+              available <= 0
+                  ? 'Límite de $_kMaxSubtasks subtareas alcanzado'
+                  : 'Solo puedes añadir $available subtarea${available == 1 ? '' : 's'} más (límite: $_kMaxSubtasks)',
+            ),
+            duration: const Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+          ));
+        // No creamos nada: el usuario puede corregir el número
+        return;
+      }
+
+      for (int i = 0; i < repeat; i++) {
+        await actions.createSubtask(taskId: task.id, title: baseTitle);
+      }
       inputCtrl.clear();
       charCount.value = 0;
     }
@@ -502,12 +542,21 @@ class _SubtaskSection extends HookConsumerWidget {
     // Mismo comportamiento que editar: guardar al salir de pantalla
     useEffect(() {
       return () {
-        final title = inputCtrl.text.trim();
-        final safe  = title.length > _kSubtaskMaxLength
-            ? title.substring(0, _kSubtaskMaxLength)
-            : title;
-        if (isAdding.value && safe.isNotEmpty) {
-          actions.createSubtask(taskId: task.id, title: safe);
+        final raw = inputCtrl.text.trim();
+        if (!isAdding.value || raw.isEmpty) return;
+
+        // Parsear xN también al salir, respetando el límite
+        final parsed    = _parseXn(raw);
+        final baseTitle = parsed.title.length > _kSubtaskMaxLength
+            ? parsed.title.substring(0, _kSubtaskMaxLength)
+            : parsed.title;
+
+        final currentCount = subtasksAsync.valueOrNull?.length ?? 0;
+        final available    = _kMaxSubtasks - currentCount;
+        final toCreate     = parsed.repeat.clamp(0, available);
+
+        for (int i = 0; i < toCreate; i++) {
+          actions.createSubtask(taskId: task.id, title: baseTitle);
         }
       };
     }, []);
@@ -626,6 +675,18 @@ class _SubtaskSection extends HookConsumerWidget {
                       ),
                     ),
                   ]),
+                  const SizedBox(height: 4),
+                  // ── Tip xN ─────────────────────────────────────────────
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Truco: añade ×3 al final para crear varias a la vez',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        fontSize: 10,
+                        color: theme.colorScheme.onSurface.withOpacity(0.28),
+                      ),
+                    ),
+                  ),
                 ],
                 const SizedBox(height: 8),
                 GestureDetector(

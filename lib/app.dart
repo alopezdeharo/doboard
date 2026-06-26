@@ -6,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'features/settings/domain/entities/app_settings.dart';
-import 'core/providers/database_provider.dart';
 
 class DoboardApp extends ConsumerStatefulWidget {
   const DoboardApp({super.key});

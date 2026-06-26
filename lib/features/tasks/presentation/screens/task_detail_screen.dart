@@ -5,7 +5,6 @@ import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../core/providers/repository_providers.dart';
 import '../../../../core/utils/automation_engine.dart';
 import '../../../../features/settings/domain/entities/app_settings.dart';
 import '../../../../features/notes/domain/entities/note.dart';

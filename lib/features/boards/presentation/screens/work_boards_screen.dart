@@ -207,6 +207,7 @@ class _ClearCompletedButton extends ConsumerWidget {
       onPressed: () async {
         final confirmed = await showModalBottomSheet<bool>(
               context: context,
+              useSafeArea: true,
               builder: (_) => const _ClearConfirmSheet(),
             ) ??
             false;
@@ -235,8 +236,9 @@ class _ClearConfirmSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final bottomInset = MediaQuery.of(context).padding.bottom;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
+      padding: EdgeInsets.fromLTRB(24, 8, 24, bottomInset > 0 ? bottomInset + 16 : 32),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
